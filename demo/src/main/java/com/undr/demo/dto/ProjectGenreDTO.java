@@ -7,7 +7,7 @@ import java.util.List;
 
 @Getter
 @Setter
-public class ProjectGenreDTO{
+public class ProjectGenreDTO {
     private MusicGenreCreationDTO mainGenre;
     private List<MusicGenreCreationDTO> subGenres;
 }

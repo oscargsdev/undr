@@ -12,12 +12,12 @@ public class SocialLinksController {
     @Autowired
     private final SocialLinksRepository socialLinksRepository;
 
-    public SocialLinksController(SocialLinksRepository socialLinksRepository){
+    public SocialLinksController(SocialLinksRepository socialLinksRepository) {
         this.socialLinksRepository = socialLinksRepository;
     }
 
     @GetMapping("/social-links")
-    public ResponseEntity<Iterable<SocialLinks>> getSocialLinks(){
+    public ResponseEntity<Iterable<SocialLinks>> getSocialLinks() {
         return ResponseEntity.ok(socialLinksRepository.findAll().stream().toList());
     }
 }

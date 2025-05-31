@@ -25,8 +25,10 @@ public class ProjectLocation {
     private String base;
     private String movingArea;
 
-    public ProjectLocation(){}
-    public ProjectLocation(String hometown, String base, String movingArea){
+    public ProjectLocation() {
+    }
+
+    public ProjectLocation(String hometown, String base, String movingArea) {
         this.hometown = hometown;
         this.base = base;
         this.movingArea = movingArea;

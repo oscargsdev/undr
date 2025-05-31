@@ -10,7 +10,7 @@ import java.time.LocalDate;
 @Getter
 @Setter
 @AllArgsConstructor
-public class ProjectUpdateDTO{
+public class ProjectUpdateDTO {
     private Long projectId;
     private String projectName;
     private LocalDate projectFoundation;

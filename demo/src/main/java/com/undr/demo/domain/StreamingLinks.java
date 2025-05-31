@@ -9,7 +9,7 @@ import lombok.Setter;
 
 @Getter
 @Setter
-//@Builder
+
 @Entity
 public class StreamingLinks {
     @Id
@@ -28,8 +28,10 @@ public class StreamingLinks {
     private String bandcamp;
     private String soundcloud;
 
-    public StreamingLinks(){};
-    public StreamingLinks(String spotify, String tidal, String appleMusic, String bandcamp, String soundcloud){
+    public StreamingLinks() {
+    }
+
+    public StreamingLinks(String spotify, String tidal, String appleMusic, String bandcamp, String soundcloud) {
         this.spotify = spotify;
         this.tidal = tidal;
         this.appleMusic = appleMusic;

@@ -15,7 +15,7 @@ import java.util.List;
 
 @RestController
 @RequiredArgsConstructor
-public class ProjectInfoController {
+public class ProjectAggregatorController {
     @Autowired
     private final ProjectRepository projectRepository;
 
@@ -37,26 +37,22 @@ public class ProjectInfoController {
     private final ModelMapper mapper = new ModelMapper();
 
     @GetMapping("/full-info")
-    public ResponseEntity<Iterable<ProjectFullInfoDTO>> getFullInfo(){
+    public ResponseEntity<Iterable<ProjectFullInfoDTO>> getFullInfo() {
         List<ProjectFullInfoDTO> fullInfo = new ArrayList<>();
 
         List<Project> projects = this.projectRepository.findAll().stream().toList();
 
-        for (Project project : projects){
+        for (Project project : projects) {
             long id = project.getProjectId();
 
             ProjectGenre pg = this.projectGenreRepository.findById(id).orElse(new ProjectGenre());
-            MusicGenreCreationDTO mainGenre = mapper.map(musicGenreRepository.findById(
-                    pg.getMainGenreId() != null ? pg.getMainGenreId() : 10L
-            ).get(), MusicGenreCreationDTO.class);
+            MusicGenreCreationDTO mainGenre = mapper.map(musicGenreRepository.findById(pg.getMainGenreId() != null ? pg.getMainGenreId() : 10L).get(), MusicGenreCreationDTO.class);
             List<MusicGenreCreationDTO> subGenres = new ArrayList<>();
 
-            for(Long subGenre : pg.getSubGenresIds()){
+            for (Long subGenre : pg.getSubGenresIds()) {
 
-                        subGenres.add(mapper.map(this.musicGenreRepository.findById(subGenre != null ? subGenre : 1L).get(), MusicGenreCreationDTO.class));
+                subGenres.add(mapper.map(this.musicGenreRepository.findById(subGenre != null ? subGenre : 1L).get(), MusicGenreCreationDTO.class));
             }
-
-
 
 
             ProjectGenreDTO genreDTO = new ProjectGenreDTO();
@@ -66,13 +62,7 @@ public class ProjectInfoController {
             StreamingLinksDTO streamingLinksDTO = mapper.map(this.streamingLinksRepository.findById(id).orElse(new StreamingLinks()), StreamingLinksDTO.class);
             SocialLinksDTO socialLinksDTO = mapper.map(this.socialLinksRepository.findById(id).orElse(new SocialLinks()), SocialLinksDTO.class);
 
-            fullInfo.add(new ProjectFullInfoDTO(
-                    project,
-                    genreDTO,
-                    locationDTO,
-                    streamingLinksDTO,
-                    socialLinksDTO
-            ));
+            fullInfo.add(new ProjectFullInfoDTO(project, genreDTO, locationDTO, streamingLinksDTO, socialLinksDTO));
         }
 
         return ResponseEntity.ok(fullInfo.stream().toList());

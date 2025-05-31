@@ -22,8 +22,10 @@ public class ProjectGenre {
     private Long mainGenreId;
     private Long[] subGenresIds;
 
-    public ProjectGenre(){}
-    public ProjectGenre(Long mainGenreId, Long... subGenresIds){
+    public ProjectGenre() {
+    }
+
+    public ProjectGenre(Long mainGenreId, Long... subGenresIds) {
         this.mainGenreId = mainGenreId;
         this.subGenresIds = subGenresIds;
     }

@@ -2,14 +2,11 @@ package com.undr.demo.domain;
 
 import com.fasterxml.jackson.annotation.JsonIgnore;
 import jakarta.persistence.*;
-import lombok.Builder;
 import lombok.Getter;
-import lombok.NoArgsConstructor;
 import lombok.Setter;
 
 @Getter
 @Setter
-//@Builder
 @Entity
 public class SocialLinks {
     @Id
@@ -27,8 +24,10 @@ public class SocialLinks {
     private String youtube;
     private String facebook;
 
-    public SocialLinks(){};
-    public SocialLinks(String instagram, String tiktok, String youtube, String facebook){
+    public SocialLinks() {
+    }
+
+    public SocialLinks(String instagram, String tiktok, String youtube, String facebook) {
         this.instagram = instagram;
         this.tiktok = tiktok;
         this.youtube = youtube;

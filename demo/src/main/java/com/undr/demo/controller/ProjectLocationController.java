@@ -12,12 +12,12 @@ public class ProjectLocationController {
     @Autowired
     private final ProjectLocationRepository projectLocationRepository;
 
-    public ProjectLocationController(ProjectLocationRepository projectLocationRepository){
+    public ProjectLocationController(ProjectLocationRepository projectLocationRepository) {
         this.projectLocationRepository = projectLocationRepository;
     }
 
     @GetMapping("/locations")
-    public ResponseEntity<Iterable<ProjectLocation>> getProjectLocations(){
+    public ResponseEntity<Iterable<ProjectLocation>> getProjectLocations() {
         return ResponseEntity.ok(projectLocationRepository.findAll().stream().toList());
     }
 }

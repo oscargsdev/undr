@@ -36,11 +36,7 @@ public class ProjectController {
     @PostMapping
     public ResponseEntity<Project> createProject(@RequestBody ProjectCreationDTO projectData) {
         Project newProject = projectService.createProject(projectData);
-        URI location = ServletUriComponentsBuilder
-                .fromCurrentRequest()
-                .path("/{projectId}")
-                .buildAndExpand(newProject.getProjectId())
-                .toUri();
+        URI location = ServletUriComponentsBuilder.fromCurrentRequest().path("/{projectId}").buildAndExpand(newProject.getProjectId()).toUri();
 
         return ResponseEntity.created(location).body(newProject);
     }

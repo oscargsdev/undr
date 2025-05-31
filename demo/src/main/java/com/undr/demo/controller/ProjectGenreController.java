@@ -12,12 +12,12 @@ public class ProjectGenreController {
     @Autowired
     private final ProjectGenreRepository projectGenreRepository;
 
-    public ProjectGenreController(ProjectGenreRepository projectGenreRepository){
+    public ProjectGenreController(ProjectGenreRepository projectGenreRepository) {
         this.projectGenreRepository = projectGenreRepository;
     }
 
     @GetMapping("/genres")
-    public ResponseEntity<Iterable<ProjectGenre>> getGenres(){
+    public ResponseEntity<Iterable<ProjectGenre>> getGenres() {
         return ResponseEntity.ok(projectGenreRepository.findAll().stream().toList());
     }
 }

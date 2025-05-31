@@ -7,6 +7,5 @@ public record ProjectFullInfoDTO(
         ProjectGenreDTO projectGenre,
         ProjectLocationDTO projectLocation,
         StreamingLinksDTO streamingLinks,
-        SocialLinksDTO socialLinks)
-{
+        SocialLinksDTO socialLinks) {
 }

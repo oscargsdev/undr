@@ -13,7 +13,7 @@ public class PrototypeController {
     private MusicGenreRepository musicGenreRepository;
 
     @GetMapping("/musicgenres")
-    public ResponseEntity<Iterable<MusicGenre>> getMusicGenres(){
+    public ResponseEntity<Iterable<MusicGenre>> getMusicGenres() {
         return ResponseEntity.ok(musicGenreRepository.findAll().stream().toList());
     }
 

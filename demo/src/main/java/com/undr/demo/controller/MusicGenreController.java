@@ -36,11 +36,7 @@ public class MusicGenreController {
     @PostMapping
     public ResponseEntity<MusicGenre> createMusicGenre(@RequestBody MusicGenreCreationDTO musicGenreData) {
         MusicGenre newMusicGenre = musicGenreService.createMusicGenre(musicGenreData);
-        URI location = ServletUriComponentsBuilder
-                .fromCurrentRequest()
-                .path("/{musicGenreId}")
-                .buildAndExpand(newMusicGenre.getMusicGenreId())
-                .toUri();
+        URI location = ServletUriComponentsBuilder.fromCurrentRequest().path("/{musicGenreId}").buildAndExpand(newMusicGenre.getMusicGenreId()).toUri();
 
         return ResponseEntity.created(location).body(newMusicGenre);
     }

@@ -12,12 +12,12 @@ public class StreamingLinksController {
     @Autowired
     private final StreamingLinksRepository streamingLinksRepository;
 
-    public StreamingLinksController(StreamingLinksRepository streamingLinksRepository){
+    public StreamingLinksController(StreamingLinksRepository streamingLinksRepository) {
         this.streamingLinksRepository = streamingLinksRepository;
     }
 
     @GetMapping("/streaming-links")
-    public ResponseEntity<Iterable<StreamingLinks>> getStreamingLinks(){
+    public ResponseEntity<Iterable<StreamingLinks>> getStreamingLinks() {
         return ResponseEntity.ok(streamingLinksRepository.findAll().stream().toList());
     }
 }
