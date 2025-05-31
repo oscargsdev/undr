@@ -2,7 +2,9 @@ package com.undr.demo.bootstrap;
 
 import com.undr.demo.domain.*;
 import com.undr.demo.domain.enums.ProjectStatusEnum;
+import com.undr.demo.dto.ProjectCreationDTO;
 import com.undr.demo.repository.*;
+import com.undr.demo.service.ProjectService;
 import jakarta.transaction.Transactional;
 import lombok.extern.slf4j.Slf4j;
 import org.hibernate.SessionFactory;
@@ -20,28 +22,35 @@ import java.util.stream.Collectors;
 @Slf4j
 @Component
 public class BootstrapData implements CommandLineRunner {
-    private final ProjectRepository projectRepository;
+    private final ProjectService projectService;
     private final ProjectGenreRepository projectGenreRepository;
     private final ProjectLocationRepository projectLocationRepository;
     private final StreamingLinksRepository streamingLinksRepository;
     private final SocialLinksRepository socialLinksRepository;
+    private final MusicGenreRepository musicGenreRepository;
+    private final MusicGenreDummyData musicGenreDummyData;
 
 
     private final SessionFactory sessionFactory;
 
     public BootstrapData(
-            ProjectRepository projectRepository,
+            ProjectService projectService,
             ProjectGenreRepository projectGenreRepository,
             ProjectLocationRepository projectLocationRepository,
             StreamingLinksRepository streamingLinksRepository,
             SocialLinksRepository socialLinksRepository,
+            MusicGenreRepository musicGenreRepository,
             SessionFactory sessionFactory){
-        this.projectRepository = projectRepository;
+        this.projectService = projectService;
+
         this.projectGenreRepository = projectGenreRepository;
         this.projectLocationRepository = projectLocationRepository;
         this.streamingLinksRepository = streamingLinksRepository;
         this.socialLinksRepository = socialLinksRepository;
         this.sessionFactory = sessionFactory;
+        this.musicGenreRepository = musicGenreRepository;
+        musicGenreDummyData = new MusicGenreDummyData(this.musicGenreRepository);
+        musicGenreDummyData.insertInDB();
     }
     private static final Random RANDOM = new Random();
     public static <T extends Enum<?>> T getRandomEnum(Class<T> clazz) {
@@ -514,6 +523,8 @@ public class BootstrapData implements CommandLineRunner {
                 })
                 .collect(Collectors.toList());
 
+
+
         List<List<String>> bandSocialLinks = undergroundBands.stream()
                 .map(bandName -> {
                     String slug = bandName.toLowerCase()
@@ -529,107 +540,105 @@ public class BootstrapData implements CommandLineRunner {
                 })
                 .collect(Collectors.toList());
 
-        Project project = new Project();
-        project.setProjectName("undersleep");
-        project.setProjectFoundation(LocalDate.now());
-        project.setStatus(ProjectStatusEnum.ACTIVE);
-        this.projectRepository.save(project);
+        Random random = new Random();
 
-        Project project2 = new Project();
-        project2.setProjectName("caspio");
-        project2.setProjectFoundation(LocalDate.now());
-        project2.setStatus(ProjectStatusEnum.IN_LIMBO);
-        this.projectRepository.save(project2);
-
-        Project project3 = new Project();
-        project3.setProjectName("epifani");
-        project3.setProjectFoundation(LocalDate.now());
-        project3.setStatus(ProjectStatusEnum.IN_LIMBO);
-        this.projectRepository.save(project3);
+//        Project project = new Project();
+//        project.setProjectName("undersleep");
+//        project.setProjectFoundation(LocalDate.now());
+//        project.setStatus(ProjectStatusEnum.ACTIVE);
+//        this.projectRepository.save(project);
+//
+//        Project project2 = new Project();
+//        project2.setProjectName("caspio");
+//        project2.setProjectFoundation(LocalDate.now());
+//        project2.setStatus(ProjectStatusEnum.IN_LIMBO);
+//        this.projectRepository.save(project2);
+//
+//        Project project3 = new Project();
+//        project3.setProjectName("epifani");
+//        project3.setProjectFoundation(LocalDate.now());
+//        project3.setStatus(ProjectStatusEnum.IN_LIMBO);
+//        this.projectRepository.save(project3);
 
         int maxVal = Math.min(undergroundBands.size(), undergroundGenres.size());
         maxVal = Math.min(maxVal, undergroundSubgenres.size());
         maxVal = Math.min(maxVal, bandLocations.size());
 
         for (int i = 0; i < maxVal; i++){
-            Project project4 = new Project();
-            project4.setProjectName(undergroundBands.get(i));
-            project4.setProjectFoundation(getRandomDateBetween1969AndNow());
-            project4.setStatus(getRandomEnum(ProjectStatusEnum.class));
-            this.projectRepository.save(project4);
+            ProjectCreationDTO project4 = new ProjectCreationDTO(undergroundBands.get(i), getRandomDateBetween1969AndNow(), getRandomEnum(ProjectStatusEnum.class));
+            this.projectService.createProject(project4);
 
-            ProjectGenre genre4 = new ProjectGenre(undergroundGenres.get(i),
-                    undergroundSubgenres.get(i).toArray(new String[0]));
-            genre4.setProject(project4);
-            this.projectGenreRepository.save(genre4);
-
-            ProjectLocation projectLocation4 = new ProjectLocation(
-                    bandLocations.get(i).get(0),
-                    bandLocations.get(i).get(1),
-                    bandLocations.get(i).get(2));
-            projectLocation4.setProject(project4);
-            this.projectLocationRepository.save(projectLocation4);
-
-
-            StreamingLinks streamingLinks4 = new StreamingLinks(
-                    bandStreamingLinks.get(i).get(0),
-                    bandStreamingLinks.get(i).get(1),
-                    bandStreamingLinks.get(i).get(2),
-                    bandStreamingLinks.get(i).get(3),
-                    bandStreamingLinks.get(i).get(4));
-            streamingLinks4.setProject(project4);
-            this.streamingLinksRepository.save(streamingLinks4);
-
-            SocialLinks socialLinks4 = new SocialLinks(
-                    bandSocialLinks.get(i).get(0),
-                    bandSocialLinks.get(i).get(1),
-                    bandSocialLinks.get(i).get(2),
-                    bandSocialLinks.get(i).get(3)
-            );
-            socialLinks4.setProject(project4);
-            this.socialLinksRepository.save(socialLinks4);
+//            ProjectGenre genre4 = new ProjectGenre(random.nextLong(1, 400), random.nextLong(1, 400), random.nextLong(1, 400), random.nextLong(1, 400));
+//            genre4.setProject(project4);
+//            this.projectGenreRepository.save(genre4);
+//
+//            ProjectLocation projectLocation4 = new ProjectLocation(
+//                    bandLocations.get(i).get(0),
+//                    bandLocations.get(i).get(1),
+//                    bandLocations.get(i).get(2));
+//            projectLocation4.setProject(project4);
+//            this.projectLocationRepository.save(projectLocation4);
+//
+//
+//            StreamingLinks streamingLinks4 = new StreamingLinks(
+//                    bandStreamingLinks.get(i).get(0),
+//                    bandStreamingLinks.get(i).get(1),
+//                    bandStreamingLinks.get(i).get(2),
+//                    bandStreamingLinks.get(i).get(3),
+//                    bandStreamingLinks.get(i).get(4));
+//            streamingLinks4.setProject(project4);
+//            this.streamingLinksRepository.save(streamingLinks4);
+//
+//            SocialLinks socialLinks4 = new SocialLinks(
+//                    bandSocialLinks.get(i).get(0),
+//                    bandSocialLinks.get(i).get(1),
+//                    bandSocialLinks.get(i).get(2),
+//                    bandSocialLinks.get(i).get(3)
+//            );
+//            socialLinks4.setProject(project4);
+//            this.socialLinksRepository.save(socialLinks4);
         }
 
 
 
-        ProjectGenre genre = new ProjectGenre("shoegaze", "alt", "dreampop");
-        genre.setProject(project);
-        this.projectGenreRepository.save(genre);
-
-        ProjectGenre genre2 = new ProjectGenre("psych rock", "alt");
-        genre2.setProject(project2);
-        this.projectGenreRepository.save(genre2);
+//        ProjectGenre genre = new ProjectGenre("shoegaze", "alt", "dreampop");
+//        genre.setProject(project);
+//        this.projectGenreRepository.save(genre);
+//
+//        ProjectGenre genre2 = new ProjectGenre("psych rock", "alt");
+//        genre2.setProject(project2);
+//        this.projectGenreRepository.save(genre2);
 //
 //        ProjectGenre genre2 = new ProjectGenre("math rock", "midwest emo", "progresiva");
 //        genre2.setProject(project2);
 //        this.projectGenreRepository.save(genre2);
 //
 
-        ProjectLocation projectLocation = new ProjectLocation("Ocotlan", "Ocotlan", "AMG");
-        projectLocation.setProject(project);
-        this.projectLocationRepository.save(projectLocation);
-
-        ProjectLocation projectLocation2 = new ProjectLocation("Gdl", "Gdl", "AMG");
-        projectLocation2.setProject(project2);
-        this.projectLocationRepository.save(projectLocation2);
-
-        StreamingLinks streamingLinks = new StreamingLinks("spotify.com/undersleep",
-                "tidal.com/undersleep",
-                "applemusic.com/undersleep",
-                "bandcamp.com/undersleep",
-                "soundcloud.com/undersleep");
-
-        streamingLinks.setProject(project);
-        this.streamingLinksRepository.save(streamingLinks);
-
-
-        SocialLinks socialLinks = new SocialLinks(
-                "instagram.com/undrsleep",
-                "tiktok.com/undersleep",
-                "youtube.com/undersleep",
-                "facebook.com/undersleep"
-                );
-        socialLinks.setProject(project);
-        this.socialLinksRepository.save(socialLinks);
+//        ProjectLocation projectLocation = new ProjectLocation("Ocotlan", "Ocotlan", "AMG");
+//        projectLocation.setProject(project);
+//        this.projectLocationRepository.save(projectLocation);
+//
+//        ProjectLocation projectLocation2 = new ProjectLocation("Gdl", "Gdl", "AMG");
+//        projectLocation2.setProject(project2);
+//        this.projectLocationRepository.save(projectLocation2);
+//
+//        StreamingLinks streamingLinks = new StreamingLinks("spotify.com/undersleep",
+//                "tidal.com/undersleep",
+//                "applemusic.com/undersleep",
+//                "bandcamp.com/undersleep",
+//                "soundcloud.com/undersleep");
+//
+//        streamingLinks.setProject(project);
+//        this.streamingLinksRepository.save(streamingLinks);
+//
+//
+//        SocialLinks socialLinks = new SocialLinks(
+//                "instagram.com/undrsleep",
+//                "tiktok.com/undersleep",
+//                "youtube.com/undersleep",
+//                "facebook.com/undersleep"
+//                );
+//        socialLinks.setProject(project);
+//        this.socialLinksRepository.save(socialLinks);
     }
 }

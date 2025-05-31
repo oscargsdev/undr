@@ -29,16 +29,6 @@ public class Project {
     @Enumerated(EnumType.STRING)
     private ProjectStatusEnum status;
 
-//    @OneToOne(cascade = CascadeType.ALL)
-//    @JoinColumn(name = "genre_id")
-//    private MusicGenre genre;
-//
-//    private ProjectLocation location;
-//
-//    private SocialLinks socialLinks;
-//
-//    private StreamingLinks streamingLinks;
-
     @Override
     public boolean equals(Object o) {
         if (o == null || getClass() != o.getClass()) return false;

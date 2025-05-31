@@ -19,21 +19,21 @@ public class ProjectGenre {
     @JsonIgnore
     private Project project;
 
-    private String mainGenre;
-    private String[] subGenres;
+    private Long mainGenreId;
+    private Long[] subGenresIds;
 
     public ProjectGenre(){}
-    public ProjectGenre(String mainGenre, String... subGenres){
-        this.mainGenre = mainGenre;
-        this.subGenres = subGenres;
+    public ProjectGenre(Long mainGenreId, Long... subGenresIds){
+        this.mainGenreId = mainGenreId;
+        this.subGenresIds = subGenresIds;
     }
 
     @Override
     public String toString() {
         return "ProjectGenre{" +
                 "projectId=" + projectId +
-                ", mainGenre='" + mainGenre + '\'' +
-                ", subGenres=" + Arrays.toString(subGenres) +
+                ", mainGenre='" + mainGenreId + '\'' +
+                ", subGenres=" + Arrays.toString(subGenresIds) +
                 '}';
     }
 }
