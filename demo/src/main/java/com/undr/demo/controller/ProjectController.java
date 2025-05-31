@@ -11,34 +11,34 @@ import org.springframework.web.servlet.support.ServletUriComponentsBuilder;
 
 import java.net.URI;
 
-@RestController()
+@RestController
 @RequestMapping("/v1/projects")
 public class ProjectController {
-   @Autowired
-   private final ProjectService projectService;
+    @Autowired
+    private final ProjectService projectService;
 
     public ProjectController(ProjectService projectService) {
         this.projectService = projectService;
     }
 
-    @GetMapping()
-    public ResponseEntity<Iterable<Project>> getAllProjects(){
+    @GetMapping
+    public ResponseEntity<Iterable<Project>> getAllProjects() {
         return ResponseEntity.ok(projectService.getAllProjects());
     }
 
     @GetMapping("/{projectId}")
-    public ResponseEntity<Project> getProjectById(@PathVariable long projectId){
-        Project project = projectService.getProject(projectId);
+    public ResponseEntity<Project> getProjectById(@PathVariable long projectId) {
+        Project project = projectService.getProjectById(projectId);
 
         return ResponseEntity.ok(project);
     }
 
     @PostMapping
-    public ResponseEntity<Project> createProject(@RequestBody ProjectCreationDTO projectData){
+    public ResponseEntity<Project> createProject(@RequestBody ProjectCreationDTO projectData) {
         Project newProject = projectService.createProject(projectData);
         URI location = ServletUriComponentsBuilder
                 .fromCurrentRequest()
-                .path("/{userId}")
+                .path("/{projectId}")
                 .buildAndExpand(newProject.getProjectId())
                 .toUri();
 
@@ -46,14 +46,14 @@ public class ProjectController {
     }
 
     @PutMapping
-    public ResponseEntity<Project> updateProject(@RequestBody ProjectUpdateDTO projectData){
+    public ResponseEntity<Project> updateProject(@RequestBody ProjectUpdateDTO projectData) {
         Project updatedProject = projectService.updateProject(projectData);
 
         return ResponseEntity.ok(updatedProject);
     }
 
     @DeleteMapping("/{projectId}")
-    public ResponseEntity<Void> deleteProject(@PathVariable long projectId){
+    public ResponseEntity<Void> deleteProject(@PathVariable long projectId) {
         projectService.deleteProject(projectId);
 
         return ResponseEntity.noContent().build();

@@ -46,14 +46,14 @@ public class ProjectInfoController {
             long id = project.getProjectId();
 
             ProjectGenre pg = this.projectGenreRepository.findById(id).orElse(new ProjectGenre());
-            MusicGenreDTO mainGenre = mapper.map(musicGenreRepository.findById(
+            MusicGenreCreationDTO mainGenre = mapper.map(musicGenreRepository.findById(
                     pg.getMainGenreId() != null ? pg.getMainGenreId() : 10L
-            ).get(), MusicGenreDTO.class);
-            List<MusicGenreDTO> subGenres = new ArrayList<>();
+            ).get(), MusicGenreCreationDTO.class);
+            List<MusicGenreCreationDTO> subGenres = new ArrayList<>();
 
             for(Long subGenre : pg.getSubGenresIds()){
 
-                        subGenres.add(mapper.map(this.musicGenreRepository.findById(subGenre != null ? subGenre : 1L).get(), MusicGenreDTO.class));
+                        subGenres.add(mapper.map(this.musicGenreRepository.findById(subGenre != null ? subGenre : 1L).get(), MusicGenreCreationDTO.class));
             }
 
 

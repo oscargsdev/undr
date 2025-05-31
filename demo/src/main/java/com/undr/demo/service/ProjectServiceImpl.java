@@ -37,14 +37,14 @@ public class ProjectServiceImpl implements ProjectService{
     }
 
     @Override
-    public Project getProject(Long projectId) {
+    public Project getProjectById(long projectId) {
         Project project = projectRepository.findById(projectId).get();
 
         return project;
     }
 
     @Override
-    public void deleteProject(Long projectId) {
+    public void deleteProject(long projectId) {
         Project deletedProject = projectRepository.findById(projectId).get();
 
         projectRepository.delete(deletedProject);

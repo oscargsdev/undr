@@ -15,5 +15,6 @@ public class MusicGenre {
     @GeneratedValue(strategy = GenerationType.AUTO)
     private final Long musicGenreId;
 
+    // TODO: by now only the name is _necessary_. Will think about how to enrich this class.
     String musicGenreName;
 }

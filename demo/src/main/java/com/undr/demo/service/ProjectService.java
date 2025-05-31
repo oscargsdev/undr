@@ -7,7 +7,7 @@ import com.undr.demo.dto.ProjectUpdateDTO;
 public interface ProjectService {
     Project createProject(ProjectCreationDTO projectData);
     Project updateProject(ProjectUpdateDTO projectData);
-    Project getProject(Long projectId);
-    void deleteProject(Long projectId);
+    Project getProjectById(long projectId);
+    void deleteProject(long projectId);
     Iterable<Project> getAllProjects();
 }

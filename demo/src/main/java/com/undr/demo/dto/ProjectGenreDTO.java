@@ -8,6 +8,6 @@ import java.util.List;
 @Getter
 @Setter
 public class ProjectGenreDTO{
-    private MusicGenreDTO mainGenre;
-    private List<MusicGenreDTO> subGenres;
+    private MusicGenreCreationDTO mainGenre;
+    private List<MusicGenreCreationDTO> subGenres;
 }
