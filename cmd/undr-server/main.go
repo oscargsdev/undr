@@ -8,6 +8,8 @@ import (
 	"os"
 	"sync"
 	"time"
+
+	"github.com/oscargsdev/undr/internal/modules/identity"
 )
 
 type config struct {
@@ -22,9 +24,10 @@ type config struct {
 }
 
 type application struct {
-	config config
-	logger *slog.Logger
-	wg     sync.WaitGroup
+	config          config
+	logger          *slog.Logger
+	wg              sync.WaitGroup
+	identityService identity.IdentityService
 }
 
 func main() {
@@ -51,9 +54,12 @@ func main() {
 	// defer db.Close()
 	// logger.Info("database connection pool established")
 
+	identityService := identity.NewIdentityService()
+
 	app := &application{
-		config: cfg,
-		logger: logger,
+		config:          cfg,
+		logger:          logger,
+		identityService: identityService,
 	}
 
 	err := app.serve()
