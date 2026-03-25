@@ -4,6 +4,7 @@ import (
 	"net/http"
 
 	"github.com/oscargsdev/undr/internal/modules/identity/delivery"
+	"github.com/oscargsdev/undr/internal/modules/identity/service"
 )
 
 type Module struct {
@@ -13,7 +14,13 @@ type Module struct {
 func New() *Module {
 	module := &Module{}
 
-	module.Router = delivery.NewRouter()
+	svc := service.New()
+
+	handler := delivery.NewHandler(svc)
+
+	router := delivery.NewRouter(*handler)
+
+	module.Router = router
 
 	return module
 }

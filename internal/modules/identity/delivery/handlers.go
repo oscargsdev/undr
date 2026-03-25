@@ -3,15 +3,20 @@ package delivery
 import (
 	"fmt"
 	"net/http"
+
+	"github.com/oscargsdev/undr/internal/modules/identity/service"
 )
 
-func NewRouter() http.Handler {
-	mux := http.NewServeMux()
-
-	mux.HandleFunc("GET /test", test)
-	return mux
+type Handler struct {
+	Service service.IdentityService
 }
 
-func test(w http.ResponseWriter, r *http.Request) {
-	fmt.Fprint(w, "Testing the identity routing")
+func NewHandler(svc service.IdentityService) *Handler {
+	return &Handler{
+		Service: svc,
+	}
+}
+
+func (h *Handler) TestHandler(w http.ResponseWriter, r *http.Request) {
+	fmt.Fprint(w, h.Service.InterfaceTest())
 }
