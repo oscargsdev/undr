@@ -24,10 +24,10 @@ type config struct {
 }
 
 type application struct {
-	config          config
-	logger          *slog.Logger
-	wg              sync.WaitGroup
-	identityService identity.IdentityService
+	config         config
+	logger         *slog.Logger
+	wg             sync.WaitGroup
+	identityModule *identity.Module
 }
 
 func main() {
@@ -54,12 +54,12 @@ func main() {
 	// defer db.Close()
 	// logger.Info("database connection pool established")
 
-	identityService := identity.NewIdentityService()
+	identityModule := identity.New()
 
 	app := &application{
-		config:          cfg,
-		logger:          logger,
-		identityService: identityService,
+		config:         cfg,
+		logger:         logger,
+		identityModule: identityModule,
 	}
 
 	err := app.serve()

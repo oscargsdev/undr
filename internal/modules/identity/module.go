@@ -1,16 +1,19 @@
 package identity
 
-type IdentityService interface {
-	HelloAuth() string
+import (
+	"net/http"
+
+	"github.com/oscargsdev/undr/internal/modules/identity/delivery"
+)
+
+type Module struct {
+	Router http.Handler
 }
 
-type IdentityServiceImpl struct {
-}
+func New() *Module {
+	module := &Module{}
 
-func (*IdentityServiceImpl) HelloAuth() string {
-	return "Hello from the Auth/Identity service!"
-}
+	module.Router = delivery.NewRouter()
 
-func NewIdentityService() *IdentityServiceImpl {
-	return &IdentityServiceImpl{}
+	return module
 }
