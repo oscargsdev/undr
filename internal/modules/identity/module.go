@@ -3,7 +3,7 @@ package identity
 import (
 	"net/http"
 
-	"github.com/oscargsdev/undr/internal/modules/identity/delivery"
+	delivery "github.com/oscargsdev/undr/internal/modules/identity/delivery/http"
 	"github.com/oscargsdev/undr/internal/modules/identity/service"
 )
 
