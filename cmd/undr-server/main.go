@@ -9,6 +9,8 @@ import (
 	"sync"
 	"time"
 
+	_ "github.com/lib/pq"
+
 	"github.com/oscargsdev/undr/internal/modules/identity"
 )
 
@@ -36,7 +38,7 @@ func main() {
 	flag.IntVar(&cfg.port, "port", 4000, "API Server Port")
 	flag.StringVar(&cfg.env, "env", "development", "Environment (development|staging|production)")
 
-	flag.StringVar(&cfg.db.dsn, "db-dsn", "", "PostgreSQL DSN")
+	flag.StringVar(&cfg.db.dsn, "db-dsn", "postgres://undrdb:pa55word@localhost/undrdb", "PostgreSQL DSN")
 
 	flag.IntVar(&cfg.db.maxOpenConns, "db-max-open-conns", 25, "PostgreSQL max open connections")
 	flag.IntVar(&cfg.db.maxIdleConns, "db-max-idle-conns", 25, "PostgreSQL max idle connections")
@@ -46,13 +48,13 @@ func main() {
 
 	logger := slog.New(slog.NewTextHandler(os.Stdout, nil))
 
-	// db, err := openDB(cfg)
-	// if err != nil {
-	// 	logger.Error(err.Error())
-	// 	os.Exit(1)
-	// }
-	// defer db.Close()
-	// logger.Info("database connection pool established")
+	db, err := openDB(cfg)
+	if err != nil {
+		logger.Error(err.Error())
+		os.Exit(1)
+	}
+	defer db.Close()
+	logger.Info("database connection pool established")
 
 	identityModule := identity.New()
 
@@ -62,7 +64,7 @@ func main() {
 		identityModule: identityModule,
 	}
 
-	err := app.serve()
+	err = app.serve()
 	if err != nil {
 		logger.Error(err.Error())
 		os.Exit(1)
