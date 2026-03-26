@@ -17,6 +17,10 @@ func NewHandler(svc service.IdentityService) *Handler {
 	}
 }
 
-func (h *Handler) TestHandler(w http.ResponseWriter, r *http.Request) {
-	fmt.Fprint(w, h.Service.InterfaceTest())
+func (h *Handler) registerUserHandler(w http.ResponseWriter, r *http.Request) {
+	id, err := h.Service.RegisterUser()
+	if err != nil {
+
+	}
+	fmt.Fprintf(w, "Registering the user with ID %d", id)
 }

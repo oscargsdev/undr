@@ -1,7 +1,7 @@
 package service
 
 type IdentityService interface {
-	InterfaceTest() string
+	RegisterUser() (int, error)
 }
 
 type identityService struct {
@@ -11,6 +11,6 @@ func New() *identityService {
 	return &identityService{}
 }
 
-func (service *identityService) InterfaceTest() string {
-	return "Hello from the auth service, this string is going thru a lot of places"
+func (s *identityService) RegisterUser() (int, error) {
+	return 1, nil
 }
