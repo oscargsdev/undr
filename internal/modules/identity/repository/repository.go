@@ -11,7 +11,7 @@ import (
 	"github.com/oscargsdev/undr/internal/modules/identity/domain"
 )
 
-type UserRepository interface {
+type IdentityRepository interface {
 	InsertUser(*domain.User) error
 	UpdateUser(*domain.User) error
 }

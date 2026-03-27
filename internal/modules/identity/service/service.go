@@ -12,11 +12,11 @@ type IdentityService interface {
 }
 
 type identityService struct {
-	repository repository.UserRepository
+	repository repository.IdentityRepository
 	logger     *slog.Logger
 }
 
-func New(repository repository.UserRepository, logger *slog.Logger) *identityService {
+func New(repository repository.IdentityRepository, logger *slog.Logger) *identityService {
 	logger.Info("Entering New Service Identity")
 
 	return &identityService{
