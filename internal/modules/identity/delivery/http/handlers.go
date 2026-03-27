@@ -21,8 +21,6 @@ type Handler struct {
 }
 
 func NewHandler(svc service.IdentityService, logger *slog.Logger) *Handler {
-	logger.Info("Entering NewHandler Identity")
-
 	return &Handler{
 		Service: svc,
 		logger:  logger,
@@ -30,8 +28,6 @@ func NewHandler(svc service.IdentityService, logger *slog.Logger) *Handler {
 }
 
 func (h *Handler) registerUserHandler(w http.ResponseWriter, r *http.Request) {
-	h.logger.Info("Receiving request to register new User")
-
 	var input struct {
 		Username string `json:"username"`
 		Email    string `json:"email"`

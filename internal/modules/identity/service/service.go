@@ -17,8 +17,6 @@ type identityService struct {
 }
 
 func New(repository repository.IdentityRepository, logger *slog.Logger) *identityService {
-	logger.Info("Entering New Service Identity")
-
 	return &identityService{
 		repository: repository,
 		logger:     logger,

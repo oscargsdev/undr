@@ -16,14 +16,13 @@ type Module struct {
 }
 
 func New(db *sql.DB, logger *slog.Logger) *Module {
-	logger.Info("Entering New Identity Module")
 	module := &Module{}
 
 	repo := repository.NewRepository(db, logger)
 	svc := service.New(repo, logger)
 	handler := delivery.NewHandler(svc, logger)
 	router := delivery.NewRouter(*handler)
-	module.Router = router
 
+	module.Router = router
 	return module
 }
