@@ -1,9 +1,12 @@
-package common
+package errors
 
 import (
 	"fmt"
 	"log/slog"
 	"net/http"
+
+	"github.com/oscargsdev/undr/internal/common"
+	jsonUtils "github.com/oscargsdev/undr/internal/common/json"
 )
 
 func logError(r *http.Request, err error, logger *slog.Logger) {
@@ -16,9 +19,9 @@ func logError(r *http.Request, err error, logger *slog.Logger) {
 }
 
 func errorResponse(w http.ResponseWriter, r *http.Request, status int, message any, logger *slog.Logger) {
-	env := Envelope{"error": message}
+	env := common.Envelope{"error": message}
 
-	err := WriteJSON(w, status, env, nil)
+	err := jsonUtils.WriteJSON(w, status, env, nil)
 	if err != nil {
 		logError(r, err, logger)
 		w.WriteHeader(500)
@@ -46,7 +49,7 @@ func BadRequestResponse(w http.ResponseWriter, r *http.Request, err error, logge
 	errorResponse(w, r, http.StatusBadRequest, err.Error(), logger)
 }
 
-func failedValidationResponse(w http.ResponseWriter, r *http.Request, errors map[string]string, logger *slog.Logger) {
+func FailedValidationResponse(w http.ResponseWriter, r *http.Request, errors map[string]string, logger *slog.Logger) {
 	errorResponse(w, r, http.StatusUnprocessableEntity, errors, logger)
 }
 

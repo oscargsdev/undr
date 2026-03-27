@@ -5,8 +5,12 @@ import (
 	"net/http"
 
 	"github.com/oscargsdev/undr/internal/common"
+	"github.com/oscargsdev/undr/internal/common/validator"
 	"github.com/oscargsdev/undr/internal/modules/identity/domain"
 	"github.com/oscargsdev/undr/internal/modules/identity/service"
+
+	errorResponses "github.com/oscargsdev/undr/internal/common/errors"
+	jsonUtils "github.com/oscargsdev/undr/internal/common/json"
 )
 
 type Handler struct {
@@ -32,9 +36,9 @@ func (h *Handler) registerUserHandler(w http.ResponseWriter, r *http.Request) {
 		Password string `json:"password"`
 	}
 
-	err := common.ReadJSON(w, r, &input)
+	err := jsonUtils.ReadJSON(w, r, &input)
 	if err != nil {
-		common.BadRequestResponse(w, r, err, h.logger)
+		errorResponses.BadRequestResponse(w, r, err, h.logger)
 		return
 	}
 
@@ -46,11 +50,17 @@ func (h *Handler) registerUserHandler(w http.ResponseWriter, r *http.Request) {
 
 	err = user.Password.Set(input.Password)
 	if err != nil {
-		common.ServerErrorResponse(w, r, err, h.logger)
+		errorResponses.ServerErrorResponse(w, r, err, h.logger)
 		return
 	}
 
-	// Validate User struct
+	v := validator.New()
+
+	if domain.ValidateUser(v, user); !v.Valid() {
+		errorResponses.FailedValidationResponse(w, r, v.Errors, h.logger)
+		return
+	}
+
 	// Call service to register User, passing the User struct
 	// Response ->  created + user struct (json)
 	err = h.Service.RegisterUser(user)
@@ -58,8 +68,8 @@ func (h *Handler) registerUserHandler(w http.ResponseWriter, r *http.Request) {
 
 	}
 
-	err = common.WriteJSON(w, http.StatusAccepted, common.Envelope{"user": user}, nil)
+	err = jsonUtils.WriteJSON(w, http.StatusAccepted, common.Envelope{"user": user}, nil)
 	if err != nil {
-		common.ServerErrorResponse(w, r, err, h.logger)
+		errorResponses.ServerErrorResponse(w, r, err, h.logger)
 	}
 }

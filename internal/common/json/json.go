@@ -1,4 +1,4 @@
-package common
+package json
 
 import (
 	"encoding/json"
@@ -7,6 +7,8 @@ import (
 	"io"
 	"net/http"
 	"strings"
+
+	"github.com/oscargsdev/undr/internal/common"
 )
 
 func ReadJSON(w http.ResponseWriter, r *http.Request, dst any) error {
@@ -54,7 +56,7 @@ func ReadJSON(w http.ResponseWriter, r *http.Request, dst any) error {
 	return nil
 }
 
-func WriteJSON(w http.ResponseWriter, status int, data Envelope, headers http.Header) error {
+func WriteJSON(w http.ResponseWriter, status int, data common.Envelope, headers http.Header) error {
 	js, err := json.MarshalIndent(data, "", "\t")
 	if err != nil {
 		return err

@@ -4,6 +4,7 @@ import (
 	"errors"
 	"time"
 
+	"github.com/oscargsdev/undr/internal/common/validator"
 	"golang.org/x/crypto/bcrypt"
 )
 
@@ -42,4 +43,29 @@ func (p *password) Set(plaintextPassword string) error {
 	p.hash = hash
 
 	return nil
+}
+
+func ValidateEmail(v *validator.Validator, email string) {
+	v.Check(email != "", "email", "must be provided")
+	v.Check(validator.Matches(email, validator.EmailRX), "email", "must be a valid email address")
+}
+
+func ValidatePassword(v *validator.Validator, password string) {
+	v.Check(password != "", "password", "must be provided")
+	v.Check(len(password) >= 8, "password", "must be at least 8 bytes long")
+	v.Check(len(password) <= 72, "password", "must not be more than 72 bytes long")
+}
+
+func ValidateUser(v *validator.Validator, user *User) {
+	v.Check(user.Username != "", "username", "must be provided")
+	v.Check(len(user.Username) <= 500, "username", "must not be more than 500 bytes long")
+	ValidateEmail(v, user.Email)
+
+	if user.Password.plaintext != nil {
+		ValidatePassword(v, *user.Password.plaintext)
+	}
+
+	if user.Password.hash == nil {
+		panic("missing password hash for user")
+	}
 }
