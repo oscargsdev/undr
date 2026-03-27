@@ -1,6 +1,8 @@
 package identity
 
 import (
+	"database/sql"
+	"log/slog"
 	"net/http"
 
 	delivery "github.com/oscargsdev/undr/internal/modules/identity/delivery/http"
@@ -10,14 +12,16 @@ import (
 
 type Module struct {
 	Router http.Handler
+	logger *slog.Logger
 }
 
-func New() *Module {
+func New(db *sql.DB, logger *slog.Logger) *Module {
+	logger.Info("Entering New Identity Module")
 	module := &Module{}
 
-	repo := store.NewRepository()
-	svc := service.New(repo)
-	handler := delivery.NewHandler(svc)
+	repo := store.NewRepository(db, logger)
+	svc := service.New(repo, logger)
+	handler := delivery.NewHandler(svc, logger)
 	router := delivery.NewRouter(*handler)
 	module.Router = router
 

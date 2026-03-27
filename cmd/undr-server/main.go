@@ -56,7 +56,7 @@ func main() {
 	defer db.Close()
 	logger.Info("database connection pool established")
 
-	identityModule := identity.New()
+	identityModule := identity.New(db, logger)
 
 	app := &application{
 		config:         cfg,

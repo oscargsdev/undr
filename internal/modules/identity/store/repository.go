@@ -1,6 +1,9 @@
 package store
 
 import (
+	"database/sql"
+	"log/slog"
+
 	"github.com/oscargsdev/undr/internal/modules/identity/domain"
 )
 
@@ -10,11 +13,16 @@ type UserRepository interface {
 }
 
 type Repository struct {
-	// db *sql.DB
+	db     *sql.DB
+	logger *slog.Logger
 }
 
-func NewRepository() *Repository {
-	return &Repository{}
+func NewRepository(db *sql.DB, logger *slog.Logger) *Repository {
+	logger.Info("Entering New Repository Identity")
+	return &Repository{
+		db:     db,
+		logger: logger,
+	}
 }
 
 func (r *Repository) InsertUser(user *domain.User) error {

@@ -2,6 +2,7 @@ package delivery
 
 import (
 	"fmt"
+	"log/slog"
 	"net/http"
 
 	"github.com/oscargsdev/undr/internal/modules/identity/domain"
@@ -10,15 +11,20 @@ import (
 
 type Handler struct {
 	Service service.IdentityService
+	logger  *slog.Logger
 }
 
-func NewHandler(svc service.IdentityService) *Handler {
+func NewHandler(svc service.IdentityService, logger *slog.Logger) *Handler {
+	logger.Info("Entering NewHandler Identity")
+
 	return &Handler{
 		Service: svc,
+		logger:  logger,
 	}
 }
 
 func (h *Handler) registerUserHandler(w http.ResponseWriter, r *http.Request) {
+	h.logger.Info("Receiving request to register new User")
 	// Create input struct
 	// Read JSON from request and load to input struct
 	// Load input data to User struct
