@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"net/http"
 
+	"github.com/oscargsdev/undr/internal/modules/identity/domain"
 	"github.com/oscargsdev/undr/internal/modules/identity/service"
 )
 
@@ -18,9 +19,16 @@ func NewHandler(svc service.IdentityService) *Handler {
 }
 
 func (h *Handler) registerUserHandler(w http.ResponseWriter, r *http.Request) {
-	id, err := h.Service.RegisterUser()
+	// Create input struct
+	// Read JSON from request and load to input struct
+	// Load input data to User struct
+	user := &domain.User{}
+	// Validate User struct
+	// Call service to register User, passing the User struct
+	// Response ->  created + user struct (json)
+	err := h.Service.RegisterUser(user)
 	if err != nil {
 
 	}
-	fmt.Fprintf(w, "Registering the user with ID %d", id)
+	fmt.Fprintf(w, "New User: %+v", user)
 }

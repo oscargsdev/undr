@@ -5,6 +5,7 @@ import (
 
 	delivery "github.com/oscargsdev/undr/internal/modules/identity/delivery/http"
 	"github.com/oscargsdev/undr/internal/modules/identity/service"
+	"github.com/oscargsdev/undr/internal/modules/identity/store"
 )
 
 type Module struct {
@@ -14,12 +15,10 @@ type Module struct {
 func New() *Module {
 	module := &Module{}
 
-	svc := service.New()
-
+	repo := store.NewRepository()
+	svc := service.New(repo)
 	handler := delivery.NewHandler(svc)
-
 	router := delivery.NewRouter(*handler)
-
 	module.Router = router
 
 	return module
