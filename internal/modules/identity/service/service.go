@@ -28,7 +28,10 @@ func New(repository store.UserRepository, logger *slog.Logger) *identityService 
 func (s *identityService) RegisterUser(user *domain.User) error {
 	// Receive User pointer
 	// domain repository call to insert user
-	s.repository.InsertUser(user)
+	err := s.repository.InsertUser(user)
+	if err != nil {
+		return err
+	}
 	// domain call to insert permission
 	// generate activation token
 	// TODO: generate email to send to user

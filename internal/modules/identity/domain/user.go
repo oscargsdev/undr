@@ -15,7 +15,7 @@ type User struct {
 	CreatedAt time.Time `json:"created_at"`
 	Username  string    `json:"username"`
 	Email     string    `json:"email"`
-	Password  password  `json:"-"`
+	Password  Password  `json:"-"`
 	Activated bool      `json:"activated"`
 	Version   int       `json:"-"`
 }
@@ -28,19 +28,19 @@ var (
 	ErrDuplicateEmail = errors.New("duplicate email")
 )
 
-type password struct {
-	plaintext *string
-	hash      []byte
+type Password struct {
+	Plaintext *string
+	Hash      []byte
 }
 
-func (p *password) Set(plaintextPassword string) error {
+func (p *Password) Set(plaintextPassword string) error {
 	hash, err := bcrypt.GenerateFromPassword([]byte(plaintextPassword), 12)
 	if err != nil {
 		return err
 	}
 
-	p.plaintext = &plaintextPassword
-	p.hash = hash
+	p.Plaintext = &plaintextPassword
+	p.Hash = hash
 
 	return nil
 }
@@ -61,11 +61,11 @@ func ValidateUser(v *validator.Validator, user *User) {
 	v.Check(len(user.Username) <= 500, "username", "must not be more than 500 bytes long")
 	ValidateEmail(v, user.Email)
 
-	if user.Password.plaintext != nil {
-		ValidatePassword(v, *user.Password.plaintext)
+	if user.Password.Plaintext != nil {
+		ValidatePassword(v, *user.Password.Plaintext)
 	}
 
-	if user.Password.hash == nil {
+	if user.Password.Hash == nil {
 		panic("missing password hash for user")
 	}
 }
