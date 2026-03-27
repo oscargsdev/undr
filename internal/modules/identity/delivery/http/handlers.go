@@ -1,10 +1,10 @@
 package delivery
 
 import (
-	"fmt"
 	"log/slog"
 	"net/http"
 
+	"github.com/oscargsdev/undr/internal/common"
 	"github.com/oscargsdev/undr/internal/modules/identity/domain"
 	"github.com/oscargsdev/undr/internal/modules/identity/service"
 )
@@ -25,16 +25,41 @@ func NewHandler(svc service.IdentityService, logger *slog.Logger) *Handler {
 
 func (h *Handler) registerUserHandler(w http.ResponseWriter, r *http.Request) {
 	h.logger.Info("Receiving request to register new User")
-	// Create input struct
-	// Read JSON from request and load to input struct
-	// Load input data to User struct
-	user := &domain.User{}
+
+	var input struct {
+		Username string `json:"username"`
+		Email    string `json:"email"`
+		Password string `json:"password"`
+	}
+
+	err := common.ReadJSON(w, r, &input)
+	if err != nil {
+		common.BadRequestResponse(w, r, err, h.logger)
+		return
+	}
+
+	user := &domain.User{
+		Username:  input.Username,
+		Email:     input.Email,
+		Activated: false,
+	}
+
+	err = user.Password.Set(input.Password)
+	if err != nil {
+		common.ServerErrorResponse(w, r, err, h.logger)
+		return
+	}
+
 	// Validate User struct
 	// Call service to register User, passing the User struct
 	// Response ->  created + user struct (json)
-	err := h.Service.RegisterUser(user)
+	err = h.Service.RegisterUser(user)
 	if err != nil {
 
 	}
-	fmt.Fprintf(w, "New User: %+v", user)
+
+	err = common.WriteJSON(w, http.StatusAccepted, common.Envelope{"user": user}, nil)
+	if err != nil {
+		common.ServerErrorResponse(w, r, err, h.logger)
+	}
 }

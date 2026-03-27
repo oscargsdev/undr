@@ -26,9 +26,6 @@ func NewRepository(db *sql.DB, logger *slog.Logger) *Repository {
 }
 
 func (r *Repository) InsertUser(user *domain.User) error {
-	user.Username = "New User"
-	user.Email = "user@mail.com"
-	user.Password = "pa55word"
 	return nil
 }
 
