@@ -4,7 +4,7 @@ import (
 	"log/slog"
 
 	"github.com/oscargsdev/undr/internal/modules/identity/domain"
-	"github.com/oscargsdev/undr/internal/modules/identity/store"
+	"github.com/oscargsdev/undr/internal/modules/identity/repository"
 )
 
 type IdentityService interface {
@@ -12,11 +12,11 @@ type IdentityService interface {
 }
 
 type identityService struct {
-	repository store.UserRepository
+	repository repository.UserRepository
 	logger     *slog.Logger
 }
 
-func New(repository store.UserRepository, logger *slog.Logger) *identityService {
+func New(repository repository.UserRepository, logger *slog.Logger) *identityService {
 	logger.Info("Entering New Service Identity")
 
 	return &identityService{

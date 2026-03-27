@@ -8,8 +8,8 @@ import (
 	"github.com/oscargsdev/undr/internal/common"
 	"github.com/oscargsdev/undr/internal/common/validator"
 	"github.com/oscargsdev/undr/internal/modules/identity/domain"
+	"github.com/oscargsdev/undr/internal/modules/identity/repository"
 	"github.com/oscargsdev/undr/internal/modules/identity/service"
-	"github.com/oscargsdev/undr/internal/modules/identity/store"
 
 	errorResponses "github.com/oscargsdev/undr/internal/common/errors"
 	jsonUtils "github.com/oscargsdev/undr/internal/common/json"
@@ -63,12 +63,10 @@ func (h *Handler) registerUserHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Call service to register User, passing the User struct
-	// Response ->  created + user struct (json)
 	err = h.Service.RegisterUser(user)
 	if err != nil {
 		switch {
-		case errors.Is(err, store.ErrDuplicateEmail):
+		case errors.Is(err, repository.ErrDuplicateEmail):
 			v.AddError("email", "a user with this email address already exists")
 			errorResponses.FailedValidationResponse(w, r, v.Errors, h.logger)
 		default:
