@@ -7,7 +7,8 @@ import (
 func NewRouter(handler Handler) http.Handler {
 	mux := http.NewServeMux()
 
-	mux.HandleFunc("/register", handler.registerUserHandler)
+	mux.HandleFunc("POST /register", handler.registerUserHandler)
+	mux.HandleFunc("PUT /activate", handler.ActivateUserHandler)
 
 	return mux
 }

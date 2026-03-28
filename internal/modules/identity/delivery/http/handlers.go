@@ -76,3 +76,30 @@ func (h *Handler) registerUserHandler(w http.ResponseWriter, r *http.Request) {
 		errorResponses.ServerErrorResponse(w, r, err, h.logger)
 	}
 }
+
+func (h *Handler) ActivateUserHandler(w http.ResponseWriter, r *http.Request) {
+	var input struct {
+		TokenPlainText string `json:"activationToken"`
+	}
+
+	err := jsonUtils.ReadJSON(w, r, &input)
+	if err != nil {
+		errorResponses.BadRequestResponse(w, r, err, h.logger)
+		return
+	}
+
+	v := validator.New()
+
+	if domain.ValidateTokenPlaintext(v, input.TokenPlainText); !v.Valid() {
+		errorResponses.FailedValidationResponse(w, r, v.Errors, h.logger)
+		return
+	}
+
+	// Call activate user to service
+	user := &domain.User{}
+	user.Username = "activated user"
+	user.Activated = true
+
+	// Return user struct
+	err = jsonUtils.WriteJSON(w, http.StatusOK, common.Envelope{"user": user}, nil)
+}
