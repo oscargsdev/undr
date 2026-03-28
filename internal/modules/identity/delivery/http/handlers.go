@@ -59,7 +59,7 @@ func (h *Handler) registerUserHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	err = h.Service.RegisterUser(user)
+	activationToken, err := h.Service.RegisterUser(user)
 	if err != nil {
 		switch {
 		case errors.Is(err, repository.ErrDuplicateEmail):
@@ -71,7 +71,7 @@ func (h *Handler) registerUserHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	err = jsonUtils.WriteJSON(w, http.StatusAccepted, common.Envelope{"user": user}, nil)
+	err = jsonUtils.WriteJSON(w, http.StatusAccepted, common.Envelope{"user": user, "activation_token": activationToken.Plaintext}, nil)
 	if err != nil {
 		errorResponses.ServerErrorResponse(w, r, err, h.logger)
 	}
