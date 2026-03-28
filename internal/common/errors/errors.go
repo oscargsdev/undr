@@ -53,7 +53,7 @@ func FailedValidationResponse(w http.ResponseWriter, r *http.Request, errors map
 	errorResponse(w, r, http.StatusUnprocessableEntity, errors, logger)
 }
 
-func editConflictResponse(w http.ResponseWriter, r *http.Request, logger *slog.Logger) {
+func EditConflictResponse(w http.ResponseWriter, r *http.Request, logger *slog.Logger) {
 	message := "unable to update the record due to an edit conflict, please try again"
 	errorResponse(w, r, http.StatusConflict, message, logger)
 }

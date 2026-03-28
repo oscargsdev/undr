@@ -95,11 +95,22 @@ func (h *Handler) ActivateUserHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Call activate user to service
-	user := &domain.User{}
-	user.Username = "activated user"
-	user.Activated = true
+	user, err := h.Service.ActivateUser(input.TokenPlainText)
+	if err != nil {
+		switch {
+		case errors.Is(err, repository.ErrRecordNotFound):
+			v.AddError("token", "invalid or expired activation token")
+			errorResponses.FailedValidationResponse(w, r, v.Errors, h.logger)
+		case errors.Is(err, repository.ErrEditConflict):
+			errorResponses.EditConflictResponse(w, r, h.logger)
+		default:
+			errorResponses.ServerErrorResponse(w, r, err, h.logger)
+		}
+		return
+	}
 
-	// Return user struct
 	err = jsonUtils.WriteJSON(w, http.StatusOK, common.Envelope{"user": user}, nil)
+	if err != nil {
+		errorResponses.ServerErrorResponse(w, r, err, h.logger)
+	}
 }
