@@ -8,83 +8,93 @@ import (
 	jsonUtils "github.com/oscargsdev/undr/internal/common/json"
 )
 
-func logError(r *http.Request, err error, logger *slog.Logger) {
+type ErrorResponseHelper struct {
+	logger *slog.Logger
+}
+
+func New(logger *slog.Logger) *ErrorResponseHelper {
+	return &ErrorResponseHelper{
+		logger: logger,
+	}
+}
+
+func (h *ErrorResponseHelper) logError(r *http.Request, err error) {
 	var (
 		method = r.Method
 		uri    = r.URL.RequestURI()
 	)
 
-	logger.Error(err.Error(), "method", method, "uri", uri)
+	h.logger.Error(err.Error(), "method", method, "uri", uri)
 }
 
-func errorResponse(w http.ResponseWriter, r *http.Request, status int, message any, logger *slog.Logger) {
+func (h *ErrorResponseHelper) errorResponse(w http.ResponseWriter, r *http.Request, status int, message any) {
 	env := jsonUtils.Envelope{"error": message}
 
 	err := jsonUtils.WriteJSON(w, status, env, nil)
 	if err != nil {
-		logError(r, err, logger)
+		h.logError(r, err)
 		w.WriteHeader(500)
 	}
 }
 
-func ServerErrorResponse(w http.ResponseWriter, r *http.Request, err error, logger *slog.Logger) {
-	logError(r, err, logger)
+func (h *ErrorResponseHelper) ServerErrorResponse(w http.ResponseWriter, r *http.Request, err error) {
+	h.logError(r, err)
 
 	message := "the server encountered an error and could not process your request"
-	errorResponse(w, r, http.StatusInternalServerError, message, logger)
+	h.errorResponse(w, r, http.StatusInternalServerError, message)
 }
 
-func notFoundResponse(w http.ResponseWriter, r *http.Request, logger *slog.Logger) {
+func (h *ErrorResponseHelper) notFoundResponse(w http.ResponseWriter, r *http.Request) {
 	message := "the requested resource could not be found"
-	errorResponse(w, r, http.StatusNotFound, message, logger)
+	h.errorResponse(w, r, http.StatusNotFound, message)
 }
 
-func methodNotallowedResponse(w http.ResponseWriter, r *http.Request, logger *slog.Logger) {
+func (h *ErrorResponseHelper) methodNotallowedResponse(w http.ResponseWriter, r *http.Request) {
 	message := fmt.Sprintf("the %s method is not supported for this resource", r.Method)
-	errorResponse(w, r, http.StatusMethodNotAllowed, message, logger)
+	h.errorResponse(w, r, http.StatusMethodNotAllowed, message)
 }
 
-func BadRequestResponse(w http.ResponseWriter, r *http.Request, err error, logger *slog.Logger) {
-	errorResponse(w, r, http.StatusBadRequest, err.Error(), logger)
+func (h *ErrorResponseHelper) BadRequestResponse(w http.ResponseWriter, r *http.Request, err error) {
+	h.errorResponse(w, r, http.StatusBadRequest, err.Error())
 }
 
-func FailedValidationResponse(w http.ResponseWriter, r *http.Request, errors map[string]string, logger *slog.Logger) {
-	errorResponse(w, r, http.StatusUnprocessableEntity, errors, logger)
+func (h *ErrorResponseHelper) FailedValidationResponse(w http.ResponseWriter, r *http.Request, errors map[string]string) {
+	h.errorResponse(w, r, http.StatusUnprocessableEntity, errors)
 }
 
-func EditConflictResponse(w http.ResponseWriter, r *http.Request, logger *slog.Logger) {
+func (h *ErrorResponseHelper) EditConflictResponse(w http.ResponseWriter, r *http.Request) {
 	message := "unable to update the record due to an edit conflict, please try again"
-	errorResponse(w, r, http.StatusConflict, message, logger)
+	h.errorResponse(w, r, http.StatusConflict, message)
 }
 
-func rateLimitExceededResponse(w http.ResponseWriter, r *http.Request, logger *slog.Logger) {
+func (h *ErrorResponseHelper) rateLimitExceededResponse(w http.ResponseWriter, r *http.Request) {
 	message := "rate limit exceeded"
-	errorResponse(w, r, http.StatusTooManyRequests, message, logger)
+	h.errorResponse(w, r, http.StatusTooManyRequests, message)
 }
 
-func invalidCredentialsResponse(w http.ResponseWriter, r *http.Request, logger *slog.Logger) {
+func (h *ErrorResponseHelper) invalidCredentialsResponse(w http.ResponseWriter, r *http.Request) {
 	message := "invalid authentication credentials"
-	errorResponse(w, r, http.StatusUnauthorized, message, logger)
+	h.errorResponse(w, r, http.StatusUnauthorized, message)
 }
 
-func invalidAuthenticationTokenResponse(w http.ResponseWriter, r *http.Request, logger *slog.Logger) {
+func (h *ErrorResponseHelper) invalidAuthenticationTokenResponse(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("WWW-Authenticate", "Bearer")
 
 	message := "invalid or missing authentication token"
-	errorResponse(w, r, http.StatusUnauthorized, message, logger)
+	h.errorResponse(w, r, http.StatusUnauthorized, message)
 }
 
-func authenticationRequiredResponse(w http.ResponseWriter, r *http.Request, logger *slog.Logger) {
+func (h *ErrorResponseHelper) authenticationRequiredResponse(w http.ResponseWriter, r *http.Request) {
 	message := "you must be authenticated to access this resource"
-	errorResponse(w, r, http.StatusUnauthorized, message, logger)
+	h.errorResponse(w, r, http.StatusUnauthorized, message)
 }
 
-func inactiveAccountResponse(w http.ResponseWriter, r *http.Request, logger *slog.Logger) {
+func (h *ErrorResponseHelper) inactiveAccountResponse(w http.ResponseWriter, r *http.Request) {
 	message := "your user account must be activated to access this resource"
-	errorResponse(w, r, http.StatusForbidden, message, logger)
+	h.errorResponse(w, r, http.StatusForbidden, message)
 }
 
-func notPermittedResponse(w http.ResponseWriter, r *http.Request, logger *slog.Logger) {
+func (h *ErrorResponseHelper) notPermittedResponse(w http.ResponseWriter, r *http.Request) {
 	message := "your user account does not have the necessary permissions to access this resource"
-	errorResponse(w, r, http.StatusForbidden, message, logger)
+	h.errorResponse(w, r, http.StatusForbidden, message)
 }

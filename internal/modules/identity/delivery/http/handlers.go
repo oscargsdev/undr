@@ -15,14 +15,16 @@ import (
 )
 
 type Handler struct {
-	Service service.IdentityService
-	logger  *slog.Logger
+	Service        service.IdentityService
+	logger         *slog.Logger
+	errorResponses *errorResponses.ErrorResponseHelper
 }
 
 func NewHandler(svc service.IdentityService, logger *slog.Logger) *Handler {
 	return &Handler{
-		Service: svc,
-		logger:  logger,
+		Service:        svc,
+		logger:         logger,
+		errorResponses: errorResponses.New(logger),
 	}
 }
 
@@ -35,7 +37,7 @@ func (h *Handler) registerUserHandler(w http.ResponseWriter, r *http.Request) {
 
 	err := jsonUtils.ReadJSON(w, r, &input)
 	if err != nil {
-		errorResponses.BadRequestResponse(w, r, err, h.logger)
+		h.errorResponses.BadRequestResponse(w, r, err)
 		return
 	}
 
@@ -47,14 +49,14 @@ func (h *Handler) registerUserHandler(w http.ResponseWriter, r *http.Request) {
 
 	err = user.Password.Set(input.Password)
 	if err != nil {
-		errorResponses.ServerErrorResponse(w, r, err, h.logger)
+		h.errorResponses.ServerErrorResponse(w, r, err)
 		return
 	}
 
 	v := validator.New()
 
 	if domain.ValidateUser(v, user); !v.Valid() {
-		errorResponses.FailedValidationResponse(w, r, v.Errors, h.logger)
+		h.errorResponses.FailedValidationResponse(w, r, v.Errors)
 		return
 	}
 
@@ -63,16 +65,16 @@ func (h *Handler) registerUserHandler(w http.ResponseWriter, r *http.Request) {
 		switch {
 		case errors.Is(err, repository.ErrDuplicateEmail):
 			v.AddError("email", "a user with this email address already exists")
-			errorResponses.FailedValidationResponse(w, r, v.Errors, h.logger)
+			h.errorResponses.FailedValidationResponse(w, r, v.Errors)
 		default:
-			errorResponses.ServerErrorResponse(w, r, err, h.logger)
+			h.errorResponses.ServerErrorResponse(w, r, err)
 		}
 		return
 	}
 
 	err = jsonUtils.WriteJSON(w, http.StatusAccepted, jsonUtils.Envelope{"user": user, "activation_token": activationToken.Plaintext}, nil)
 	if err != nil {
-		errorResponses.ServerErrorResponse(w, r, err, h.logger)
+		h.errorResponses.ServerErrorResponse(w, r, err)
 	}
 }
 
@@ -83,14 +85,14 @@ func (h *Handler) ActivateUserHandler(w http.ResponseWriter, r *http.Request) {
 
 	err := jsonUtils.ReadJSON(w, r, &input)
 	if err != nil {
-		errorResponses.BadRequestResponse(w, r, err, h.logger)
+		h.errorResponses.BadRequestResponse(w, r, err)
 		return
 	}
 
 	v := validator.New()
 
 	if domain.ValidateTokenPlaintext(v, input.TokenPlainText); !v.Valid() {
-		errorResponses.FailedValidationResponse(w, r, v.Errors, h.logger)
+		h.errorResponses.FailedValidationResponse(w, r, v.Errors)
 		return
 	}
 
@@ -99,17 +101,17 @@ func (h *Handler) ActivateUserHandler(w http.ResponseWriter, r *http.Request) {
 		switch {
 		case errors.Is(err, repository.ErrRecordNotFound):
 			v.AddError("token", "invalid or expired activation token")
-			errorResponses.FailedValidationResponse(w, r, v.Errors, h.logger)
+			h.errorResponses.FailedValidationResponse(w, r, v.Errors)
 		case errors.Is(err, repository.ErrEditConflict):
-			errorResponses.EditConflictResponse(w, r, h.logger)
+			h.errorResponses.EditConflictResponse(w, r)
 		default:
-			errorResponses.ServerErrorResponse(w, r, err, h.logger)
+			h.errorResponses.ServerErrorResponse(w, r, err)
 		}
 		return
 	}
 
 	err = jsonUtils.WriteJSON(w, http.StatusOK, jsonUtils.Envelope{"user": user}, nil)
 	if err != nil {
-		errorResponses.ServerErrorResponse(w, r, err, h.logger)
+		h.errorResponses.ServerErrorResponse(w, r, err)
 	}
 }
