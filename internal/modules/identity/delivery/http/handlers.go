@@ -5,7 +5,6 @@ import (
 	"log/slog"
 	"net/http"
 
-	"github.com/oscargsdev/undr/internal/common"
 	"github.com/oscargsdev/undr/internal/common/validator"
 	"github.com/oscargsdev/undr/internal/modules/identity/domain"
 	"github.com/oscargsdev/undr/internal/modules/identity/repository"
@@ -71,7 +70,7 @@ func (h *Handler) registerUserHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	err = jsonUtils.WriteJSON(w, http.StatusAccepted, common.Envelope{"user": user, "activation_token": activationToken.Plaintext}, nil)
+	err = jsonUtils.WriteJSON(w, http.StatusAccepted, jsonUtils.Envelope{"user": user, "activation_token": activationToken.Plaintext}, nil)
 	if err != nil {
 		errorResponses.ServerErrorResponse(w, r, err, h.logger)
 	}
@@ -109,7 +108,7 @@ func (h *Handler) ActivateUserHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	err = jsonUtils.WriteJSON(w, http.StatusOK, common.Envelope{"user": user}, nil)
+	err = jsonUtils.WriteJSON(w, http.StatusOK, jsonUtils.Envelope{"user": user}, nil)
 	if err != nil {
 		errorResponses.ServerErrorResponse(w, r, err, h.logger)
 	}

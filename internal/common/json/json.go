@@ -7,9 +7,9 @@ import (
 	"io"
 	"net/http"
 	"strings"
-
-	"github.com/oscargsdev/undr/internal/common"
 )
+
+type Envelope map[string]any
 
 func ReadJSON(w http.ResponseWriter, r *http.Request, dst any) error {
 	r.Body = http.MaxBytesReader(w, r.Body, 1_048_576)
@@ -56,7 +56,7 @@ func ReadJSON(w http.ResponseWriter, r *http.Request, dst any) error {
 	return nil
 }
 
-func WriteJSON(w http.ResponseWriter, status int, data common.Envelope, headers http.Header) error {
+func WriteJSON(w http.ResponseWriter, status int, data Envelope, headers http.Header) error {
 	js, err := json.MarshalIndent(data, "", "\t")
 	if err != nil {
 		return err

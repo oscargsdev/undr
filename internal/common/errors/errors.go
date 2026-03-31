@@ -5,7 +5,6 @@ import (
 	"log/slog"
 	"net/http"
 
-	"github.com/oscargsdev/undr/internal/common"
 	jsonUtils "github.com/oscargsdev/undr/internal/common/json"
 )
 
@@ -19,7 +18,7 @@ func logError(r *http.Request, err error, logger *slog.Logger) {
 }
 
 func errorResponse(w http.ResponseWriter, r *http.Request, status int, message any, logger *slog.Logger) {
-	env := common.Envelope{"error": message}
+	env := jsonUtils.Envelope{"error": message}
 
 	err := jsonUtils.WriteJSON(w, status, env, nil)
 	if err != nil {
