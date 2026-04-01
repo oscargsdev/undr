@@ -63,9 +63,11 @@ func (s *identityService) ActivateUser(tokenPlainText string) (refreshToken *dom
 	}
 
 	// TODO: Generate refresh and auth token, return them
-	refreshToken = &domain.Token{
-		Plaintext: "refreshToken",
+	refreshToken, err = s.repository.NewToken(user.ID, 24*time.Hour, domain.ScopeRefresh)
+	if err != nil {
+		return nil, nil, err
 	}
+
 	authToken = &domain.Token{
 		Plaintext: "authToken",
 	}
