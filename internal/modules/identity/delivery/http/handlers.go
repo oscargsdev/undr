@@ -15,14 +15,14 @@ import (
 )
 
 type Handler struct {
-	Service        service.IdentityService
+	service        service.IdentityService
 	logger         *slog.Logger
 	errorResponses *errorResponses.ErrorResponseHelper
 }
 
 func NewHandler(svc service.IdentityService, logger *slog.Logger) *Handler {
 	return &Handler{
-		Service:        svc,
+		service:        svc,
 		logger:         logger,
 		errorResponses: errorResponses.New(logger),
 	}
@@ -60,11 +60,14 @@ func (h *Handler) registerUserHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	activationToken, err := h.Service.RegisterUser(user)
+	activationToken, err := h.service.RegisterUser(user)
 	if err != nil {
 		switch {
 		case errors.Is(err, repository.ErrDuplicateEmail):
 			v.AddError("email", "a user with this email address already exists")
+			h.errorResponses.FailedValidationResponse(w, r, v.Errors)
+		case errors.Is(err, repository.ErrDuplicateUsername):
+			v.AddError("username", "a user with this username already exists")
 			h.errorResponses.FailedValidationResponse(w, r, v.Errors)
 		default:
 			h.errorResponses.ServerErrorResponse(w, r, err)
@@ -96,7 +99,7 @@ func (h *Handler) ActivateUserHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	refreshToken, authToken, err := h.Service.ActivateUser(input.TokenPlainText)
+	refreshToken, accessToken, err := h.service.ActivateUser(input.TokenPlainText)
 	if err != nil {
 		switch {
 		case errors.Is(err, repository.ErrRecordNotFound):
@@ -110,7 +113,7 @@ func (h *Handler) ActivateUserHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	err = jsonUtils.WriteJSON(w, http.StatusOK, jsonUtils.Envelope{"refreshToken": refreshToken.Plaintext, "authToken": authToken}, nil)
+	err = jsonUtils.WriteJSON(w, http.StatusOK, jsonUtils.Envelope{"refreshToken": refreshToken, "accessToken": accessToken}, nil)
 	if err != nil {
 		h.errorResponses.ServerErrorResponse(w, r, err)
 	}
@@ -127,7 +130,7 @@ func (h *Handler) TestTokenValidationHandler(w http.ResponseWriter, r *http.Requ
 		return
 	}
 
-	claims, err := h.Service.ValidateJWTToken(input.TokenString)
+	claims, err := h.service.ValidateJWTToken(input.TokenString)
 	if err != nil {
 		h.errorResponses.ServerErrorResponse(w, r, err)
 		return

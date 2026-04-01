@@ -11,7 +11,7 @@ import (
 
 type IdentityService interface {
 	RegisterUser(user *domain.User) (*domain.Token, error)
-	ActivateUser(tokenPlainText string) (*domain.Token, *string, error)
+	ActivateUser(tokenPlainText string) (refreshTokenString string, accessTokenString string, err error)
 	ValidateJWTToken(tokenString string) (*jwt.Claims, error)
 }
 
@@ -46,32 +46,35 @@ func (s *identityService) RegisterUser(user *domain.User) (*domain.Token, error)
 	return token, nil
 }
 
-func (s *identityService) ActivateUser(tokenPlainText string) (*domain.Token, *string, error) {
+func (s *identityService) ActivateUser(tokenPlainText string) (refreshTokenString string, accessTokenString string, err error) {
 	user, err := s.repository.GetForToken(domain.ScopeActivation, tokenPlainText)
 	if err != nil {
-		return nil, nil, err
+		return "", "", err
 	}
 
 	user.Activated = true
 
 	err = s.repository.UpdateUser(user)
 	if err != nil {
-		return nil, nil, err
+		return "", "", err
 	}
 
 	err = s.repository.DeleteAllFromUser(domain.ScopeActivation, user.ID)
 	if err != nil {
-		return nil, nil, err
+		return "", "", err
 	}
 
-	// TODO: Generate refresh and auth token, return them
 	refreshToken, err := s.repository.NewToken(user.ID, 24*time.Hour, domain.ScopeRefresh)
 	if err != nil {
-		return nil, nil, err
+		return "", "", err
+	}
+	refreshTokenString = refreshToken.Plaintext
+
+	accessTokenString, err = newAccessToken(user.ID)
+	if err != nil {
+		return "", "", err
 	}
 
-	authToken, err := newAuthToken(user.ID)
-
 	// EVENT: userActivated
-	return refreshToken, authToken, nil
+	return
 }

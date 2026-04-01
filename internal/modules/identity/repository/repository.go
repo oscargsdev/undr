@@ -33,14 +33,15 @@ func NewRepository(db *sql.DB, logger *slog.Logger) *Repository {
 }
 
 var (
-	ErrDuplicateEmail = errors.New("duplicate email")
-	ErrRecordNotFound = errors.New("record not found")
-	ErrEditConflict   = errors.New("edit conflict")
+	ErrDuplicateEmail    = errors.New("duplicate email")
+	ErrDuplicateUsername = errors.New("duplicate username")
+	ErrRecordNotFound    = errors.New("record not found")
+	ErrEditConflict      = errors.New("edit conflict")
 )
 
 func (r *Repository) InsertUser(user *domain.User) error {
 	query := `
-        INSERT INTO users (name, email, password_hash, activated) 
+        INSERT INTO users (username, email, password_hash, activated) 
         VALUES ($1, $2, $3, $4)
         RETURNING id, created_at, version`
 
@@ -54,6 +55,8 @@ func (r *Repository) InsertUser(user *domain.User) error {
 		switch {
 		case err.Error() == `pq: duplicate key value violates unique constraint "users_email_key" (23505)`:
 			return ErrDuplicateEmail
+		case err.Error() == `pq: duplicate key value violates unique constraint "users_username_key" (23505)`:
+			return ErrDuplicateUsername
 		default:
 			return err
 		}

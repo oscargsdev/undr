@@ -14,19 +14,21 @@ import (
 var mySigningKey = []byte("AllYourBase")
 
 type claims struct {
-	Permission string `json:"permission"`
+	Roles       []string `json:"roles"`
+	Permissions []string `json:"permissions"`
 	jwt.RegisteredClaims
 }
 
-// TODO: Return string and not pointer?
-func newAuthToken(userID int64) (*string, error) {
+func newAccessToken(userID int64) (string, error) {
 	claims := claims{
-		"readProjects",
-		jwt.RegisteredClaims{
-			// A usual scenario is to set the expiration time relative to the current time
+		Roles: []string{
+			"projectAdmin",
+		},
+		Permissions: []string{
+			"readProjects",
+		},
+		RegisteredClaims: jwt.RegisteredClaims{
 			ExpiresAt: jwt.NewNumericDate(time.Now().Add(15 * time.Minute)),
-			IssuedAt:  jwt.NewNumericDate(time.Now()),
-			NotBefore: jwt.NewNumericDate(time.Now()),
 			Issuer:    "undr-auth",
 			Subject:   strconv.FormatInt(userID, 10),
 		},
@@ -34,13 +36,13 @@ func newAuthToken(userID int64) (*string, error) {
 
 	// TODO: Check algo to sign with asymetric keys
 	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
-	ss, err := token.SignedString(mySigningKey)
+	tokenString, err := token.SignedString(mySigningKey)
 
 	if err != nil {
-		return nil, err
+		return "", err
 	}
 
-	return &ss, nil
+	return tokenString, nil
 }
 
 func (s *identityService) ValidateJWTToken(tokenString string) (*jwt.Claims, error) {
@@ -67,8 +69,7 @@ func (s *identityService) ValidateJWTToken(tokenString string) (*jwt.Claims, err
 		return nil, err
 	}
 
-	if claims, ok := token.Claims.(*claims); ok {
-		fmt.Println(claims.Permission, claims.Issuer)
+	if _, ok := token.Claims.(*claims); ok {
 		return &token.Claims, nil
 	} else {
 		log.Fatal("unknown claims type, cannot proceed")
