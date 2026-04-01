@@ -1,6 +1,9 @@
 package service
 
 import (
+	"errors"
+	"fmt"
+	"log"
 	"strconv"
 	"time"
 
@@ -38,4 +41,37 @@ func newAuthToken(userID int64) (*string, error) {
 	}
 
 	return &ss, nil
+}
+
+func (s *identityService) ValidateJWTToken(tokenString string) (*jwt.Claims, error) {
+	token, err := jwt.ParseWithClaims(tokenString, &claims{}, func(token *jwt.Token) (any, error) {
+		return []byte("AllYourBase"), nil
+	})
+
+	switch {
+	case token.Valid:
+		fmt.Println("You look nice today")
+	case errors.Is(err, jwt.ErrTokenMalformed):
+		fmt.Println("That's not even a token")
+		return nil, err
+	case errors.Is(err, jwt.ErrTokenSignatureInvalid):
+		// Invalid signature
+		fmt.Println("Invalid signature")
+		return nil, err
+	case errors.Is(err, jwt.ErrTokenExpired) || errors.Is(err, jwt.ErrTokenNotValidYet):
+		// Token is either expired or not active yet
+		fmt.Println("Timing is everything")
+		return nil, err
+	default:
+		fmt.Println("Couldn't handle this token:", err)
+		return nil, err
+	}
+
+	if claims, ok := token.Claims.(*claims); ok {
+		fmt.Println(claims.Permission, claims.Issuer)
+		return &token.Claims, nil
+	} else {
+		log.Fatal("unknown claims type, cannot proceed")
+		return nil, err
+	}
 }

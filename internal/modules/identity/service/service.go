@@ -4,6 +4,7 @@ import (
 	"log/slog"
 	"time"
 
+	"github.com/golang-jwt/jwt/v5"
 	"github.com/oscargsdev/undr/internal/modules/identity/domain"
 	"github.com/oscargsdev/undr/internal/modules/identity/repository"
 )
@@ -11,6 +12,7 @@ import (
 type IdentityService interface {
 	RegisterUser(user *domain.User) (*domain.Token, error)
 	ActivateUser(tokenPlainText string) (*domain.Token, *string, error)
+	ValidateJWTToken(tokenString string) (*jwt.Claims, error)
 }
 
 type identityService struct {

@@ -115,3 +115,23 @@ func (h *Handler) ActivateUserHandler(w http.ResponseWriter, r *http.Request) {
 		h.errorResponses.ServerErrorResponse(w, r, err)
 	}
 }
+
+func (h *Handler) TestTokenValidationHandler(w http.ResponseWriter, r *http.Request) {
+	var input struct {
+		TokenString string `json:"tokenString"`
+	}
+
+	err := jsonUtils.ReadJSON(w, r, &input)
+	if err != nil {
+		h.errorResponses.BadRequestResponse(w, r, err)
+		return
+	}
+
+	claims, err := h.Service.ValidateJWTToken(input.TokenString)
+	if err != nil {
+		h.errorResponses.ServerErrorResponse(w, r, err)
+		return
+	}
+
+	err = jsonUtils.WriteJSON(w, http.StatusOK, jsonUtils.Envelope{"claims": claims}, nil)
+}
