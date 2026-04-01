@@ -110,7 +110,7 @@ func (h *Handler) ActivateUserHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	err = jsonUtils.WriteJSON(w, http.StatusOK, jsonUtils.Envelope{"refreshToken": refreshToken.Plaintext, "authToken": authToken.Plaintext}, nil)
+	err = jsonUtils.WriteJSON(w, http.StatusOK, jsonUtils.Envelope{"refreshToken": refreshToken.Plaintext, "authToken": authToken}, nil)
 	if err != nil {
 		h.errorResponses.ServerErrorResponse(w, r, err)
 	}
