@@ -96,7 +96,7 @@ func (h *Handler) ActivateUserHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	user, err := h.Service.ActivateUser(input.TokenPlainText)
+	refreshToken, authToken, err := h.Service.ActivateUser(input.TokenPlainText)
 	if err != nil {
 		switch {
 		case errors.Is(err, repository.ErrRecordNotFound):
@@ -110,7 +110,7 @@ func (h *Handler) ActivateUserHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	err = jsonUtils.WriteJSON(w, http.StatusOK, jsonUtils.Envelope{"user": user}, nil)
+	err = jsonUtils.WriteJSON(w, http.StatusOK, jsonUtils.Envelope{"refreshToken": refreshToken.Plaintext, "authToken": authToken.Plaintext}, nil)
 	if err != nil {
 		h.errorResponses.ServerErrorResponse(w, r, err)
 	}

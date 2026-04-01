@@ -10,7 +10,7 @@ import (
 
 type IdentityService interface {
 	RegisterUser(user *domain.User) (*domain.Token, error)
-	ActivateUser(tokenPlainText string) (*domain.User, error)
+	ActivateUser(tokenPlainText string) (refreshToken *domain.Token, authToken *domain.Token, err error)
 }
 
 type identityService struct {
@@ -38,30 +38,37 @@ func (s *identityService) RegisterUser(user *domain.User) (*domain.Token, error)
 		return nil, err
 	}
 
+	// EVENT: userRegistered
 	// TODO: generate email to send to user
 
 	return token, nil
 }
 
-func (s *identityService) ActivateUser(tokenPlainText string) (*domain.User, error) {
+func (s *identityService) ActivateUser(tokenPlainText string) (refreshToken *domain.Token, authToken *domain.Token, err error) {
 	user, err := s.repository.GetForToken(domain.ScopeActivation, tokenPlainText)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 
 	user.Activated = true
 
 	err = s.repository.UpdateUser(user)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 
 	err = s.repository.DeleteAllFromUser(domain.ScopeActivation, user.ID)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 
 	// TODO: Generate refresh and auth token, return them
-
-	return user, nil
+	refreshToken = &domain.Token{
+		Plaintext: "refreshToken",
+	}
+	authToken = &domain.Token{
+		Plaintext: "authToken",
+	}
+	// EVENT: userActivated
+	return refreshToken, authToken, nil
 }
