@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"strings"
 
+	"github.com/golang-jwt/jwt/v5"
 	"github.com/oscargsdev/undr/internal/common/validator"
 	"github.com/oscargsdev/undr/internal/modules/identity/domain"
 	"github.com/oscargsdev/undr/internal/modules/identity/repository"
@@ -158,14 +159,29 @@ func (h *Handler) TestSecuredEndpoint(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	token := headerParts[1]
+	tokenString := headerParts[1]
 
 	// Validate token and handle errors
-	claims, err := h.service.ValidateJWTToken(token)
+	token, err := h.service.ValidateJWTToken(tokenString)
+
 	if err != nil {
-		h.errorResponses.InvalidAccessTokenResponse(w, r)
-		return
+		switch {
+		case errors.Is(err, jwt.ErrTokenMalformed):
+			h.errorResponses.MalformedTokenResponse(w, r)
+			return
+		case errors.Is(err, jwt.ErrTokenSignatureInvalid):
+			h.errorResponses.InvalidAccessTokenResponse(w, r)
+			return
+		case errors.Is(err, jwt.ErrTokenExpired) || errors.Is(err, jwt.ErrTokenNotValidYet):
+			h.errorResponses.InvalidAccessTokenResponse(w, r)
+			return
+		case errors.Is(err, service.ErrUnknownClaims):
+			h.errorResponses.InvalidAccessTokenResponse(w, r)
+		default:
+			h.errorResponses.ServerErrorResponse(w, r, err)
+			return
+		}
 	}
 
-	jsonUtils.WriteJSON(w, http.StatusOK, jsonUtils.Envelope{"claims": claims}, nil)
+	jsonUtils.WriteJSON(w, http.StatusOK, jsonUtils.Envelope{"token": token}, nil)
 }

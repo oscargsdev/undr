@@ -84,6 +84,11 @@ func (h *ErrorResponseHelper) InvalidAccessTokenResponse(w http.ResponseWriter, 
 	h.errorResponse(w, r, http.StatusUnauthorized, message)
 }
 
+func (h *ErrorResponseHelper) MalformedTokenResponse(w http.ResponseWriter, r *http.Request) {
+	message := "malformed access token"
+	h.errorResponse(w, r, http.StatusBadRequest, message)
+}
+
 func (h *ErrorResponseHelper) authenticationRequiredResponse(w http.ResponseWriter, r *http.Request) {
 	message := "you must be authenticated to access this resource"
 	h.errorResponse(w, r, http.StatusUnauthorized, message)

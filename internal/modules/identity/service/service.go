@@ -12,7 +12,7 @@ import (
 type IdentityService interface {
 	RegisterUser(user *domain.User) (*domain.Token, error)
 	ActivateUser(tokenPlainText string) (refreshTokenString string, accessTokenString string, err error)
-	ValidateJWTToken(tokenString string) (*jwt.Claims, error)
+	ValidateJWTToken(tokenString string) (*jwt.Token, error)
 }
 
 type identityService struct {

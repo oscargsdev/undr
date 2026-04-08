@@ -2,18 +2,16 @@ package service
 
 import (
 	"errors"
-	"fmt"
-	"log"
 	"strconv"
 	"time"
 
 	"github.com/golang-jwt/jwt/v5"
 )
 
-// TODO: Define custom errors for Token Validation
-
 // TODO:  Get the signing key from env
 var mySigningKey = []byte("AllYourBase")
+
+var ErrUnknownClaims = errors.New("unknown claims")
 
 type claims struct {
 	Roles       []string `json:"roles"`
@@ -47,36 +45,24 @@ func newAccessToken(userID int64) (string, error) {
 	return tokenString, nil
 }
 
-func (s *identityService) ValidateJWTToken(tokenString string) (*jwt.Claims, error) {
+func (s *identityService) ValidateJWTToken(tokenString string) (*jwt.Token, error) {
+	// TODO: What dows this validate exactly?
 	token, err := jwt.ParseWithClaims(tokenString, &claims{}, func(token *jwt.Token) (any, error) {
 		return []byte("AllYourBase"), nil
 	})
 
-	// TODO: Handle errors and return custom errors
-	switch {
-	case token.Valid:
-		fmt.Println("You look nice today")
-	case errors.Is(err, jwt.ErrTokenMalformed):
-		fmt.Println("That's not even a token")
-		return nil, err
-	case errors.Is(err, jwt.ErrTokenSignatureInvalid):
-		// Invalid signature
-		fmt.Println("Invalid signature")
-		return nil, err
-	case errors.Is(err, jwt.ErrTokenExpired) || errors.Is(err, jwt.ErrTokenNotValidYet):
-		// Token is either expired or not active yet
-		fmt.Println("Timing is everything")
-		return nil, err
-	default:
-		fmt.Println("Couldn't handle this token:", err)
+	if !token.Valid {
 		return nil, err
 	}
 
+	//TODO: What else needs to be validated?
+
+	//TODO: Validate issuer? Issuer name in env var?
+
 	// TODO: What to do here? Return claims to put in request context?
 	if _, ok := token.Claims.(*claims); ok {
-		return &token.Claims, nil
+		return token, nil
 	} else {
-		log.Fatal("unknown claims type, cannot proceed")
-		return nil, err
+		return nil, ErrUnknownClaims
 	}
 }
