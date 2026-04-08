@@ -4,15 +4,13 @@ import (
 	"log/slog"
 	"time"
 
-	"github.com/golang-jwt/jwt/v5"
 	"github.com/oscargsdev/undr/internal/modules/identity/domain"
 	"github.com/oscargsdev/undr/internal/modules/identity/repository"
 )
 
 type IdentityService interface {
-	RegisterUser(user *domain.User) (*domain.Token, error)
+	RegisterUser(user *domain.User) (*domain.OpaqueToken, error)
 	ActivateUser(tokenPlainText string) (refreshTokenString string, accessTokenString string, err error)
-	ValidateJWTToken(tokenString string) (*jwt.Token, error)
 }
 
 type identityService struct {
@@ -27,7 +25,7 @@ func New(repository repository.IdentityRepository, logger *slog.Logger) *identit
 	}
 }
 
-func (s *identityService) RegisterUser(user *domain.User) (*domain.Token, error) {
+func (s *identityService) RegisterUser(user *domain.User) (*domain.OpaqueToken, error) {
 	err := s.repository.InsertUser(user)
 	if err != nil {
 		return nil, err
@@ -35,7 +33,7 @@ func (s *identityService) RegisterUser(user *domain.User) (*domain.Token, error)
 
 	// TODO: domain call to insert permission
 
-	token, err := s.repository.NewToken(user.ID, 3*24*time.Hour, domain.ScopeActivation)
+	token, err := s.repository.NewOpaqueToken(user.ID, 3*24*time.Hour, domain.ScopeActivation)
 	if err != nil {
 		return nil, err
 	}
@@ -47,7 +45,7 @@ func (s *identityService) RegisterUser(user *domain.User) (*domain.Token, error)
 }
 
 func (s *identityService) ActivateUser(tokenPlainText string) (refreshTokenString string, accessTokenString string, err error) {
-	user, err := s.repository.GetForToken(domain.ScopeActivation, tokenPlainText)
+	user, err := s.repository.GetForOpaqueToken(domain.ScopeActivation, tokenPlainText)
 	if err != nil {
 		return "", "", err
 	}
@@ -64,7 +62,7 @@ func (s *identityService) ActivateUser(tokenPlainText string) (refreshTokenStrin
 		return "", "", err
 	}
 
-	refreshToken, err := s.repository.NewToken(user.ID, 24*time.Hour, domain.ScopeRefresh)
+	refreshToken, err := s.repository.NewOpaqueToken(user.ID, 24*time.Hour, domain.ScopeRefresh)
 	if err != nil {
 		return "", "", err
 	}

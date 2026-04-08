@@ -21,6 +21,11 @@ type claims struct {
 	jwt.RegisteredClaims
 }
 
+type contextKey string
+
+const userIdContextKey = contextKey("userId")
+const permissionsContextkey = contextKey("permissions")
+
 func newAccessToken(userID int64) (string, error) {
 	claims := claims{
 		Roles: []string{
@@ -47,7 +52,7 @@ func newAccessToken(userID int64) (string, error) {
 	return tokenString, nil
 }
 
-func (s *identityService) ValidateJWTToken(tokenString string) (*jwt.Token, error) {
+func ValidateJWTToken(tokenString string) (*jwt.Token, error) {
 	// TODO: What dows this validate exactly?
 	token, err := jwt.ParseWithClaims(tokenString, &claims{}, func(token *jwt.Token) (any, error) {
 		return []byte("AllYourBase"), nil
@@ -57,7 +62,7 @@ func (s *identityService) ValidateJWTToken(tokenString string) (*jwt.Token, erro
 		return nil, err
 	}
 
-	//TODO: What else needs to be validated?
+	//TODO: What else needs to be validated? Create custom errors and handle them in handler
 
 	//TODO: Validate issuer? Issuer name in env var?
 
@@ -68,11 +73,6 @@ func (s *identityService) ValidateJWTToken(tokenString string) (*jwt.Token, erro
 		return nil, ErrUnknownClaims
 	}
 }
-
-type contextKey string
-
-const userIdContextKey = contextKey("userId")
-const permissionsContextkey = contextKey("permissions")
 
 func ContextSetClaims(r *http.Request, token *jwt.Token) *http.Request {
 	userId, _ := token.Claims.GetSubject()

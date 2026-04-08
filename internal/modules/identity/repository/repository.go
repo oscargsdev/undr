@@ -15,8 +15,8 @@ import (
 type IdentityRepository interface {
 	InsertUser(*domain.User) error
 	UpdateUser(*domain.User) error
-	NewToken(userID int64, ttl time.Duration, scope string) (*domain.Token, error)
-	GetForToken(tokenScope, tokenPlaintext string) (*domain.User, error)
+	NewOpaqueToken(userID int64, ttl time.Duration, scope string) (*domain.OpaqueToken, error)
+	GetForOpaqueToken(tokenScope, tokenPlaintext string) (*domain.User, error)
 	DeleteAllFromUser(scope string, userID int64) error
 }
 
@@ -99,8 +99,8 @@ func (r *Repository) UpdateUser(user *domain.User) error {
 	return nil
 }
 
-func generateToken(userID int64, ttl time.Duration, scope string) *domain.Token {
-	token := &domain.Token{
+func generateOpaqueToken(userID int64, ttl time.Duration, scope string) *domain.OpaqueToken {
+	token := &domain.OpaqueToken{
 		Plaintext: rand.Text(),
 		UserID:    userID,
 		Expiry:    time.Now().Add(ttl),
@@ -113,7 +113,7 @@ func generateToken(userID int64, ttl time.Duration, scope string) *domain.Token 
 	return token
 }
 
-func (r *Repository) InsertToken(token *domain.Token) error {
+func (r *Repository) InsertOpaqueToken(token *domain.OpaqueToken) error {
 	query := `
         INSERT INTO tokens (hash, user_id, expiry, scope) 
         VALUES ($1, $2, $3, $4)`
@@ -127,14 +127,14 @@ func (r *Repository) InsertToken(token *domain.Token) error {
 	return err
 }
 
-func (r *Repository) NewToken(userID int64, ttl time.Duration, scope string) (*domain.Token, error) {
-	token := generateToken(userID, ttl, scope)
+func (r *Repository) NewOpaqueToken(userID int64, ttl time.Duration, scope string) (*domain.OpaqueToken, error) {
+	token := generateOpaqueToken(userID, ttl, scope)
 
-	err := r.InsertToken(token)
+	err := r.InsertOpaqueToken(token)
 	return token, err
 }
 
-func (r *Repository) GetForToken(tokenScope, tokenPlaintext string) (*domain.User, error) {
+func (r *Repository) GetForOpaqueToken(tokenScope, tokenPlaintext string) (*domain.User, error) {
 	tokenHash := sha256.Sum256([]byte(tokenPlaintext))
 
 	query := `

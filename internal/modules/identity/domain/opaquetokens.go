@@ -13,7 +13,7 @@ const (
 	ScopeRefresh    = "refresh"
 )
 
-type Token struct {
+type OpaqueToken struct {
 	Plaintext string    `json:"token"`
 	Hash      []byte    `json:"-"`
 	UserID    int64     `json:"-"`
@@ -21,8 +21,8 @@ type Token struct {
 	Scope     string    `json:"-"`
 }
 
-func GenerateToken(userID int64, ttl time.Duration, scope string) *Token {
-	token := &Token{
+func GenerateOpaqueToken(userID int64, ttl time.Duration, scope string) *OpaqueToken {
+	token := &OpaqueToken{
 		Plaintext: rand.Text(),
 		UserID:    userID,
 		Expiry:    time.Now().Add(ttl),
@@ -35,7 +35,7 @@ func GenerateToken(userID int64, ttl time.Duration, scope string) *Token {
 	return token
 }
 
-func ValidateTokenPlaintext(v *validator.Validator, tokenPlaintext string) {
+func ValidateOpaqueTokenPlaintext(v *validator.Validator, tokenPlaintext string) {
 	v.Check(tokenPlaintext != "", "token", "must be provided")
 	v.Check(len(tokenPlaintext) == 26, "token", "must be 26 bytes long")
 }

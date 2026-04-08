@@ -4,9 +4,7 @@ import (
 	"errors"
 	"log/slog"
 	"net/http"
-	"strings"
 
-	"github.com/golang-jwt/jwt/v5"
 	"github.com/oscargsdev/undr/internal/common/validator"
 	"github.com/oscargsdev/undr/internal/modules/identity/domain"
 	"github.com/oscargsdev/undr/internal/modules/identity/repository"
@@ -96,7 +94,7 @@ func (h *Handler) activateUserHandler(w http.ResponseWriter, r *http.Request) {
 
 	v := validator.New()
 
-	if domain.ValidateTokenPlaintext(v, input.TokenPlainText); !v.Valid() {
+	if domain.ValidateOpaqueTokenPlaintext(v, input.TokenPlainText); !v.Valid() {
 		h.errorResponses.FailedValidationResponse(w, r, v.Errors)
 		return
 	}
@@ -121,78 +119,8 @@ func (h *Handler) activateUserHandler(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-func (h *Handler) testTokenValidationHandler(w http.ResponseWriter, r *http.Request) {
-	var input struct {
-		TokenString string `json:"tokenString"`
-	}
-
-	err := jsonUtils.ReadJSON(w, r, &input)
-	if err != nil {
-		h.errorResponses.BadRequestResponse(w, r, err)
-		return
-	}
-
-	claims, err := h.service.ValidateJWTToken(input.TokenString)
-	if err != nil {
-		h.errorResponses.ServerErrorResponse(w, r, err)
-		return
-	}
-
-	err = jsonUtils.WriteJSON(w, http.StatusOK, jsonUtils.Envelope{"claims": claims}, nil)
-}
-
 func (h *Handler) testSecuredEndpoint(w http.ResponseWriter, r *http.Request) {
 	userId := service.ContextGetUserId(r)
 	permissions := service.ContextGetPermissions(r)
 	jsonUtils.WriteJSON(w, http.StatusOK, jsonUtils.Envelope{"userId": userId, "permissions": permissions}, nil)
-}
-
-func (h *Handler) verifyToken(next http.Handler) http.Handler {
-	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		// TODO: What does this do?
-		// w.Header().Add("Vary", "Authorization")
-
-		// Extract Auth header
-		authorizationHeader := r.Header.Get("Authorization")
-
-		// TODO: Handle anonymous user
-		// if authorizationHeader == "" {
-		// 	r = app.contextSetUser(r, domain.AnonymousUser)
-		// 	next.ServeHTTP(w, r)
-		// 	return
-		// }
-
-		headerParts := strings.Split(authorizationHeader, " ")
-		if len(headerParts) != 2 || headerParts[0] != "Bearer" {
-			h.errorResponses.InvalidAccessTokenResponse(w, r)
-			return
-		}
-
-		tokenString := headerParts[1]
-
-		// Validate token and handle errors
-		token, err := h.service.ValidateJWTToken(tokenString)
-
-		if err != nil {
-			switch {
-			case errors.Is(err, jwt.ErrTokenMalformed):
-				h.errorResponses.MalformedTokenResponse(w, r)
-				return
-			case errors.Is(err, jwt.ErrTokenSignatureInvalid):
-				h.errorResponses.InvalidAccessTokenResponse(w, r)
-				return
-			case errors.Is(err, jwt.ErrTokenExpired) || errors.Is(err, jwt.ErrTokenNotValidYet):
-				h.errorResponses.InvalidAccessTokenResponse(w, r)
-				return
-			case errors.Is(err, service.ErrUnknownClaims):
-				h.errorResponses.InvalidAccessTokenResponse(w, r)
-			default:
-				h.errorResponses.ServerErrorResponse(w, r, err)
-				return
-			}
-		}
-
-		r = service.ContextSetClaims(r, token)
-		next.ServeHTTP(w, r)
-	})
 }
