@@ -1,7 +1,9 @@
 package service
 
 import (
+	"context"
 	"errors"
+	"net/http"
 	"strconv"
 	"time"
 
@@ -65,4 +67,38 @@ func (s *identityService) ValidateJWTToken(tokenString string) (*jwt.Token, erro
 	} else {
 		return nil, ErrUnknownClaims
 	}
+}
+
+type contextKey string
+
+const userIdContextKey = contextKey("userId")
+const permissionsContextkey = contextKey("permissions")
+
+func ContextSetClaims(r *http.Request, token *jwt.Token) *http.Request {
+	userId, _ := token.Claims.GetSubject()
+	permissions := token.Claims.(*claims).Permissions
+
+	ctx := context.WithValue(r.Context(), userIdContextKey, userId)
+	ctx = context.WithValue(ctx, permissionsContextkey, permissions)
+
+	return r.WithContext(ctx)
+}
+
+func ContextGetUserId(r *http.Request) int64 {
+	userId, ok := r.Context().Value(userIdContextKey).(string)
+	if !ok {
+		panic("missing user id value in request")
+	}
+
+	id, _ := strconv.ParseInt(userId, 10, 64)
+	return id
+}
+
+func ContextGetPermissions(r *http.Request) []string {
+	permissions, ok := r.Context().Value(permissionsContextkey).([]string)
+	if !ok {
+		panic("missing permissions value in request")
+	}
+
+	return permissions
 }

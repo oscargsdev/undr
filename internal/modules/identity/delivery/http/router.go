@@ -8,9 +8,9 @@ func NewRouter(handler Handler) http.Handler {
 	mux := http.NewServeMux()
 
 	mux.HandleFunc("POST /register", handler.registerUserHandler)
-	mux.HandleFunc("PUT /activate", handler.ActivateUserHandler)
-	mux.HandleFunc("GET /validate", handler.TestTokenValidationHandler)
-	mux.HandleFunc("GET /secured", handler.TestSecuredEndpoint)
+	mux.HandleFunc("PUT /activate", handler.activateUserHandler)
+	mux.HandleFunc("GET /validate", handler.testTokenValidationHandler)
+	mux.Handle("GET /secured", handler.verifyToken(http.HandlerFunc(handler.testSecuredEndpoint)))
 
 	return mux
 }

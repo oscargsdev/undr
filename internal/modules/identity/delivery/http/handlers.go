@@ -83,7 +83,7 @@ func (h *Handler) registerUserHandler(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-func (h *Handler) ActivateUserHandler(w http.ResponseWriter, r *http.Request) {
+func (h *Handler) activateUserHandler(w http.ResponseWriter, r *http.Request) {
 	var input struct {
 		TokenPlainText string `json:"activationToken"`
 	}
@@ -121,7 +121,7 @@ func (h *Handler) ActivateUserHandler(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-func (h *Handler) TestTokenValidationHandler(w http.ResponseWriter, r *http.Request) {
+func (h *Handler) testTokenValidationHandler(w http.ResponseWriter, r *http.Request) {
 	var input struct {
 		TokenString string `json:"tokenString"`
 	}
@@ -141,47 +141,58 @@ func (h *Handler) TestTokenValidationHandler(w http.ResponseWriter, r *http.Requ
 	err = jsonUtils.WriteJSON(w, http.StatusOK, jsonUtils.Envelope{"claims": claims}, nil)
 }
 
-// MIDDLEWARE PROTOTYPE
-func (h *Handler) TestSecuredEndpoint(w http.ResponseWriter, r *http.Request) {
-	// Extract Auth header
-	authorizationHeader := r.Header.Get("Authorization")
+func (h *Handler) testSecuredEndpoint(w http.ResponseWriter, r *http.Request) {
+	userId := service.ContextGetUserId(r)
+	permissions := service.ContextGetPermissions(r)
+	jsonUtils.WriteJSON(w, http.StatusOK, jsonUtils.Envelope{"userId": userId, "permissions": permissions}, nil)
+}
 
-	// TODO: Handle anonymous user
-	// if authorizationHeader == "" {
-	// 	r = app.contextSetUser(r, domain.AnonymousUser)
-	// 	next.ServeHTTP(w, r)
-	// 	return
-	// }
+func (h *Handler) verifyToken(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		// TODO: What does this do?
+		// w.Header().Add("Vary", "Authorization")
 
-	headerParts := strings.Split(authorizationHeader, " ")
-	if len(headerParts) != 2 || headerParts[0] != "Bearer" {
-		h.errorResponses.InvalidAccessTokenResponse(w, r)
-		return
-	}
+		// Extract Auth header
+		authorizationHeader := r.Header.Get("Authorization")
 
-	tokenString := headerParts[1]
+		// TODO: Handle anonymous user
+		// if authorizationHeader == "" {
+		// 	r = app.contextSetUser(r, domain.AnonymousUser)
+		// 	next.ServeHTTP(w, r)
+		// 	return
+		// }
 
-	// Validate token and handle errors
-	token, err := h.service.ValidateJWTToken(tokenString)
-
-	if err != nil {
-		switch {
-		case errors.Is(err, jwt.ErrTokenMalformed):
-			h.errorResponses.MalformedTokenResponse(w, r)
-			return
-		case errors.Is(err, jwt.ErrTokenSignatureInvalid):
+		headerParts := strings.Split(authorizationHeader, " ")
+		if len(headerParts) != 2 || headerParts[0] != "Bearer" {
 			h.errorResponses.InvalidAccessTokenResponse(w, r)
-			return
-		case errors.Is(err, jwt.ErrTokenExpired) || errors.Is(err, jwt.ErrTokenNotValidYet):
-			h.errorResponses.InvalidAccessTokenResponse(w, r)
-			return
-		case errors.Is(err, service.ErrUnknownClaims):
-			h.errorResponses.InvalidAccessTokenResponse(w, r)
-		default:
-			h.errorResponses.ServerErrorResponse(w, r, err)
 			return
 		}
-	}
 
-	jsonUtils.WriteJSON(w, http.StatusOK, jsonUtils.Envelope{"token": token}, nil)
+		tokenString := headerParts[1]
+
+		// Validate token and handle errors
+		token, err := h.service.ValidateJWTToken(tokenString)
+
+		if err != nil {
+			switch {
+			case errors.Is(err, jwt.ErrTokenMalformed):
+				h.errorResponses.MalformedTokenResponse(w, r)
+				return
+			case errors.Is(err, jwt.ErrTokenSignatureInvalid):
+				h.errorResponses.InvalidAccessTokenResponse(w, r)
+				return
+			case errors.Is(err, jwt.ErrTokenExpired) || errors.Is(err, jwt.ErrTokenNotValidYet):
+				h.errorResponses.InvalidAccessTokenResponse(w, r)
+				return
+			case errors.Is(err, service.ErrUnknownClaims):
+				h.errorResponses.InvalidAccessTokenResponse(w, r)
+			default:
+				h.errorResponses.ServerErrorResponse(w, r, err)
+				return
+			}
+		}
+
+		r = service.ContextSetClaims(r, token)
+		next.ServeHTTP(w, r)
+	})
 }
