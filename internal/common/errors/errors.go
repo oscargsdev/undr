@@ -77,10 +77,10 @@ func (h *ErrorResponseHelper) invalidCredentialsResponse(w http.ResponseWriter, 
 	h.errorResponse(w, r, http.StatusUnauthorized, message)
 }
 
-func (h *ErrorResponseHelper) invalidAuthenticationTokenResponse(w http.ResponseWriter, r *http.Request) {
+func (h *ErrorResponseHelper) InvalidAccessTokenResponse(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("WWW-Authenticate", "Bearer")
 
-	message := "invalid or missing authentication token"
+	message := "invalid or missing access token"
 	h.errorResponse(w, r, http.StatusUnauthorized, message)
 }
 

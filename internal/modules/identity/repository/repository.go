@@ -68,7 +68,7 @@ func (r *Repository) InsertUser(user *domain.User) error {
 func (r *Repository) UpdateUser(user *domain.User) error {
 	query := `
         UPDATE users 
-        SET name = $1, email = $2, password_hash = $3, activated = $4, version = version + 1
+        SET username = $1, email = $2, password_hash = $3, activated = $4, version = version + 1
         WHERE id = $5 AND version = $6
         RETURNING version`
 
@@ -138,7 +138,7 @@ func (r *Repository) GetForToken(tokenScope, tokenPlaintext string) (*domain.Use
 	tokenHash := sha256.Sum256([]byte(tokenPlaintext))
 
 	query := `
-        SELECT users.id, users.created_at, users.name, users.email, users.password_hash, users.activated, users.version
+        SELECT users.id, users.created_at, users.username, users.email, users.password_hash, users.activated, users.version
         FROM users
         INNER JOIN tokens
         ON users.id = tokens.user_id

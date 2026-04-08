@@ -4,6 +4,7 @@ import (
 	"errors"
 	"log/slog"
 	"net/http"
+	"strings"
 
 	"github.com/oscargsdev/undr/internal/common/validator"
 	"github.com/oscargsdev/undr/internal/modules/identity/domain"
@@ -137,4 +138,34 @@ func (h *Handler) TestTokenValidationHandler(w http.ResponseWriter, r *http.Requ
 	}
 
 	err = jsonUtils.WriteJSON(w, http.StatusOK, jsonUtils.Envelope{"claims": claims}, nil)
+}
+
+// MIDDLEWARE PROTOTYPE
+func (h *Handler) TestSecuredEndpoint(w http.ResponseWriter, r *http.Request) {
+	// Extract Auth header
+	authorizationHeader := r.Header.Get("Authorization")
+
+	// TODO: Handle anonymous user
+	// if authorizationHeader == "" {
+	// 	r = app.contextSetUser(r, domain.AnonymousUser)
+	// 	next.ServeHTTP(w, r)
+	// 	return
+	// }
+
+	headerParts := strings.Split(authorizationHeader, " ")
+	if len(headerParts) != 2 || headerParts[0] != "Bearer" {
+		h.errorResponses.InvalidAccessTokenResponse(w, r)
+		return
+	}
+
+	token := headerParts[1]
+
+	// Validate token and handle errors
+	claims, err := h.service.ValidateJWTToken(token)
+	if err != nil {
+		h.errorResponses.InvalidAccessTokenResponse(w, r)
+		return
+	}
+
+	jsonUtils.WriteJSON(w, http.StatusOK, jsonUtils.Envelope{"claims": claims}, nil)
 }

@@ -10,6 +10,8 @@ import (
 	"github.com/golang-jwt/jwt/v5"
 )
 
+// TODO: Define custom errors for Token Validation
+
 // TODO:  Get the signing key from env
 var mySigningKey = []byte("AllYourBase")
 
@@ -50,6 +52,7 @@ func (s *identityService) ValidateJWTToken(tokenString string) (*jwt.Claims, err
 		return []byte("AllYourBase"), nil
 	})
 
+	// TODO: Handle errors and return custom errors
 	switch {
 	case token.Valid:
 		fmt.Println("You look nice today")
@@ -69,6 +72,7 @@ func (s *identityService) ValidateJWTToken(tokenString string) (*jwt.Claims, err
 		return nil, err
 	}
 
+	// TODO: What to do here? Return claims to put in request context?
 	if _, ok := token.Claims.(*claims); ok {
 		return &token.Claims, nil
 	} else {
