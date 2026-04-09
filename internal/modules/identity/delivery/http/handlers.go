@@ -124,3 +124,46 @@ func (h *Handler) testSecuredEndpoint(w http.ResponseWriter, r *http.Request) {
 	permissions := service.ContextGetPermissions(r)
 	jsonUtils.WriteJSON(w, http.StatusOK, jsonUtils.Envelope{"userId": userId, "permissions": permissions}, nil)
 }
+
+func (h *Handler) authenticateUser(w http.ResponseWriter, r *http.Request) {
+	var input struct {
+		Email    string `json:"email"`
+		Password string `json:"password"`
+	}
+
+	err := jsonUtils.ReadJSON(w, r, &input)
+	if err != nil {
+		h.errorResponses.BadRequestResponse(w, r, err)
+		return
+	}
+
+	v := validator.New()
+
+	domain.ValidateEmail(v, input.Email)
+	domain.ValidatePassword(v, input.Password)
+
+	if !v.Valid() {
+		h.errorResponses.FailedValidationResponse(w, r, v.Errors)
+		return
+	}
+
+	refreshToken, accessToken, err := h.service.AuthenticateUser(input.Email, input.Password)
+	if err != nil {
+		switch {
+		case errors.Is(err, repository.ErrRecordNotFound):
+			h.errorResponses.InvalidCredentialsResponse(w, r)
+		case errors.Is(err, service.ErrInvalidCredentials):
+			h.errorResponses.InvalidCredentialsResponse(w, r)
+		case errors.Is(err, service.ErrUserNotActivated):
+			h.errorResponses.InactiveAccountResponse(w, r)
+		default:
+			h.errorResponses.ServerErrorResponse(w, r, err)
+		}
+		return
+	}
+
+	err = jsonUtils.WriteJSON(w, http.StatusOK, jsonUtils.Envelope{"refreshToken": refreshToken, "accessToken": accessToken}, nil)
+	if err != nil {
+		h.errorResponses.ServerErrorResponse(w, r, err)
+	}
+}

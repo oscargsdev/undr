@@ -72,7 +72,7 @@ func (h *ErrorResponseHelper) rateLimitExceededResponse(w http.ResponseWriter, r
 	h.errorResponse(w, r, http.StatusTooManyRequests, message)
 }
 
-func (h *ErrorResponseHelper) invalidCredentialsResponse(w http.ResponseWriter, r *http.Request) {
+func (h *ErrorResponseHelper) InvalidCredentialsResponse(w http.ResponseWriter, r *http.Request) {
 	message := "invalid authentication credentials"
 	h.errorResponse(w, r, http.StatusUnauthorized, message)
 }
@@ -94,7 +94,7 @@ func (h *ErrorResponseHelper) authenticationRequiredResponse(w http.ResponseWrit
 	h.errorResponse(w, r, http.StatusUnauthorized, message)
 }
 
-func (h *ErrorResponseHelper) inactiveAccountResponse(w http.ResponseWriter, r *http.Request) {
+func (h *ErrorResponseHelper) InactiveAccountResponse(w http.ResponseWriter, r *http.Request) {
 	message := "your user account must be activated to access this resource"
 	h.errorResponse(w, r, http.StatusForbidden, message)
 }

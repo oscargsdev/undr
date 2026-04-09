@@ -1,6 +1,7 @@
 package service
 
 import (
+	"errors"
 	"log/slog"
 	"time"
 
@@ -8,9 +9,15 @@ import (
 	"github.com/oscargsdev/undr/internal/modules/identity/repository"
 )
 
+var (
+	ErrInvalidCredentials = errors.New("invalid credentials")
+	ErrUserNotActivated   = errors.New("user not activated")
+)
+
 type IdentityService interface {
 	RegisterUser(user *domain.User) (*domain.OpaqueToken, error)
 	ActivateUser(tokenPlainText string) (refreshTokenString string, accessTokenString string, err error)
+	AuthenticateUser(email, password string) (refreshTokenString string, accessTokenString string, err error)
 }
 
 type identityService struct {
@@ -74,5 +81,39 @@ func (s *identityService) ActivateUser(tokenPlainText string) (refreshTokenStrin
 	}
 
 	// EVENT: userActivated
+	return
+}
+
+func (s *identityService) AuthenticateUser(email, password string) (refreshTokenString string, accessTokenString string, err error) {
+	user, err := s.repository.GetUserByEmail(email)
+	if err != nil {
+		return "", "", err
+	}
+
+	match, err := user.Password.Matches(password)
+	if err != nil {
+		return "", "", err
+	}
+
+	if !match {
+		return "", "", ErrInvalidCredentials
+	}
+
+	if !user.Activated {
+		return "", "", ErrUserNotActivated
+	}
+
+	refreshToken, err := s.repository.NewOpaqueToken(user.ID, 24*time.Hour, domain.ScopeRefresh)
+	if err != nil {
+		return "", "", err
+	}
+	refreshTokenString = refreshToken.Plaintext
+
+	accessTokenString, err = newAccessToken(user.ID)
+	if err != nil {
+		return "", "", err
+	}
+
+	// EVENT: userAuthenticated
 	return
 }
