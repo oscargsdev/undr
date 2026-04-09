@@ -58,6 +58,10 @@ func (h *ErrorResponseHelper) BadRequestResponse(w http.ResponseWriter, r *http.
 	h.errorResponse(w, r, http.StatusBadRequest, err.Error())
 }
 
+func (h *ErrorResponseHelper) InvalidRefresTokenResponse(w http.ResponseWriter, r *http.Request, errors map[string]string) {
+	h.errorResponse(w, r, http.StatusBadRequest, errors)
+}
+
 func (h *ErrorResponseHelper) FailedValidationResponse(w http.ResponseWriter, r *http.Request, errors map[string]string) {
 	h.errorResponse(w, r, http.StatusUnprocessableEntity, errors)
 }

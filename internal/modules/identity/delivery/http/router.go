@@ -10,6 +10,8 @@ func NewRouter(handler Handler) http.Handler {
 	mux.HandleFunc("POST /register", handler.registerUserHandler)
 	mux.HandleFunc("PUT /activate", handler.activateUserHandler)
 	mux.Handle("GET /secured", handler.verifyToken(http.HandlerFunc(handler.testSecuredEndpoint)))
-	mux.HandleFunc("POST /authenticate", handler.authenticateUser)
+	mux.HandleFunc("POST /authenticate", handler.authenticateUserHandler)
+	mux.HandleFunc("POST /refresh", handler.refreshTokenHandler)
+
 	return mux
 }

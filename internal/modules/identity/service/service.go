@@ -18,6 +18,7 @@ type IdentityService interface {
 	RegisterUser(user *domain.User) (*domain.OpaqueToken, error)
 	ActivateUser(tokenPlainText string) (refreshTokenString string, accessTokenString string, err error)
 	AuthenticateUser(email, password string) (refreshTokenString string, accessTokenString string, err error)
+	RefreshToken(oldRefreshToken string) (refreshTokenString string, accessTokenString string, err error)
 }
 
 type identityService struct {
@@ -103,6 +104,11 @@ func (s *identityService) AuthenticateUser(email, password string) (refreshToken
 		return "", "", ErrUserNotActivated
 	}
 
+	err = s.repository.DeleteAllFromUser(domain.ScopeRefresh, user.ID)
+	if err != nil {
+		return "", "", err
+	}
+
 	refreshToken, err := s.repository.NewOpaqueToken(user.ID, 24*time.Hour, domain.ScopeRefresh)
 	if err != nil {
 		return "", "", err
@@ -115,5 +121,30 @@ func (s *identityService) AuthenticateUser(email, password string) (refreshToken
 	}
 
 	// EVENT: userAuthenticated
+	return
+}
+
+func (s *identityService) RefreshToken(oldRefreshToken string) (refreshTokenString string, accessTokenString string, err error) {
+	user, err := s.repository.GetForOpaqueToken(domain.ScopeRefresh, oldRefreshToken)
+	if err != nil {
+		return "", "", err
+	}
+
+	err = s.repository.DeleteAllFromUser(domain.ScopeRefresh, user.ID)
+	if err != nil {
+		return "", "", err
+	}
+
+	refreshToken, err := s.repository.NewOpaqueToken(user.ID, 24*time.Hour, domain.ScopeRefresh)
+	if err != nil {
+		return "", "", err
+	}
+	refreshTokenString = refreshToken.Plaintext
+
+	accessTokenString, err = newAccessToken(user.ID)
+	if err != nil {
+		return "", "", err
+	}
+
 	return
 }

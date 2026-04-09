@@ -4,6 +4,7 @@ import (
 	"errors"
 	"log/slog"
 	"net/http"
+	"time"
 
 	"github.com/oscargsdev/undr/internal/common/validator"
 	"github.com/oscargsdev/undr/internal/modules/identity/domain"
@@ -18,6 +19,18 @@ type Handler struct {
 	service        service.IdentityService
 	logger         *slog.Logger
 	errorResponses *errorResponses.ErrorResponseHelper
+}
+
+func newRefreshTokenCookie(refreshToken string) *http.Cookie {
+	return &http.Cookie{
+		Name:     "refresh_token",
+		Value:    refreshToken,
+		Path:     "/v1/identity/refresh",
+		Expires:  time.Now().Add(24 * time.Hour), // TODO: Change for var for token lifespan
+		HttpOnly: true,
+		Secure:   true,
+		SameSite: http.SameSiteStrictMode,
+	}
 }
 
 func NewHandler(svc service.IdentityService, logger *slog.Logger) *Handler {
@@ -113,7 +126,9 @@ func (h *Handler) activateUserHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	err = jsonUtils.WriteJSON(w, http.StatusOK, jsonUtils.Envelope{"refreshToken": refreshToken, "accessToken": accessToken}, nil)
+	http.SetCookie(w, newRefreshTokenCookie(refreshToken))
+
+	err = jsonUtils.WriteJSON(w, http.StatusOK, jsonUtils.Envelope{"access_token": accessToken}, nil)
 	if err != nil {
 		h.errorResponses.ServerErrorResponse(w, r, err)
 	}
@@ -125,7 +140,7 @@ func (h *Handler) testSecuredEndpoint(w http.ResponseWriter, r *http.Request) {
 	jsonUtils.WriteJSON(w, http.StatusOK, jsonUtils.Envelope{"userId": userId, "permissions": permissions}, nil)
 }
 
-func (h *Handler) authenticateUser(w http.ResponseWriter, r *http.Request) {
+func (h *Handler) authenticateUserHandler(w http.ResponseWriter, r *http.Request) {
 	var input struct {
 		Email    string `json:"email"`
 		Password string `json:"password"`
@@ -162,7 +177,44 @@ func (h *Handler) authenticateUser(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	err = jsonUtils.WriteJSON(w, http.StatusOK, jsonUtils.Envelope{"refreshToken": refreshToken, "accessToken": accessToken}, nil)
+	http.SetCookie(w, newRefreshTokenCookie(refreshToken))
+
+	err = jsonUtils.WriteJSON(w, http.StatusOK, jsonUtils.Envelope{"access_token": accessToken}, nil)
+	if err != nil {
+		h.errorResponses.ServerErrorResponse(w, r, err)
+	}
+}
+
+func (h *Handler) refreshTokenHandler(w http.ResponseWriter, r *http.Request) {
+	refreshTokenCookie, err := r.Cookie("refresh_token")
+	if err != nil {
+		h.errorResponses.BadRequestResponse(w, r, err)
+		return
+	}
+
+	oldToken := refreshTokenCookie.Value
+
+	v := validator.New()
+
+	if domain.ValidateOpaqueTokenPlaintext(v, oldToken); !v.Valid() {
+		h.errorResponses.InvalidRefresTokenResponse(w, r, v.Errors)
+		return
+	}
+
+	refreshToken, accessToken, err := h.service.RefreshToken(oldToken)
+	if err != nil {
+		switch {
+		case errors.Is(err, repository.ErrRecordNotFound):
+			h.errorResponses.BadRequestResponse(w, r, domain.ErrInvalidRefreshToken)
+		default:
+			h.errorResponses.ServerErrorResponse(w, r, err)
+		}
+		return
+	}
+
+	http.SetCookie(w, newRefreshTokenCookie(refreshToken))
+
+	err = jsonUtils.WriteJSON(w, http.StatusOK, jsonUtils.Envelope{"access_token": accessToken}, nil)
 	if err != nil {
 		h.errorResponses.ServerErrorResponse(w, r, err)
 	}

@@ -3,6 +3,7 @@ package domain
 import (
 	"crypto/rand"
 	"crypto/sha256"
+	"errors"
 	"time"
 
 	"github.com/oscargsdev/undr/internal/common/validator"
@@ -11,6 +12,10 @@ import (
 const (
 	ScopeActivation = "activation"
 	ScopeRefresh    = "refresh"
+)
+
+var (
+	ErrInvalidRefreshToken = errors.New("invalid or expired refresh token")
 )
 
 type OpaqueToken struct {
