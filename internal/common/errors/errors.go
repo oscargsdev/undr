@@ -103,7 +103,7 @@ func (h *ErrorResponseHelper) InactiveAccountResponse(w http.ResponseWriter, r *
 	h.errorResponse(w, r, http.StatusForbidden, message)
 }
 
-func (h *ErrorResponseHelper) notPermittedResponse(w http.ResponseWriter, r *http.Request) {
-	message := "your user account does not have the necessary permissions to access this resource"
+func (h *ErrorResponseHelper) NotPermittedResponse(w http.ResponseWriter, r *http.Request) {
+	message := "your user account does not have the necessary roles/permissions to access this resource"
 	h.errorResponse(w, r, http.StatusForbidden, message)
 }

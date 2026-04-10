@@ -233,3 +233,7 @@ func (h *Handler) logoutHandler(w http.ResponseWriter, r *http.Request) {
 
 	w.WriteHeader(http.StatusNoContent)
 }
+
+func (h *Handler) OnlyAdminsHandler(w http.ResponseWriter, r *http.Request) {
+	jsonUtils.WriteJSON(w, http.StatusOK, jsonUtils.Envelope{"howdy": "you are an admin!"}, nil)
+}

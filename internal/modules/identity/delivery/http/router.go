@@ -9,10 +9,12 @@ func NewRouter(handler Handler) http.Handler {
 
 	mux.HandleFunc("POST /register", handler.registerUserHandler)
 	mux.HandleFunc("PUT /activate", handler.activateUserHandler)
-	mux.Handle("GET /secured", handler.verifyToken(http.HandlerFunc(handler.testSecuredEndpoint)))
 	mux.HandleFunc("POST /authenticate", handler.authenticateUserHandler)
 	mux.HandleFunc("POST /refresh", handler.refreshTokenHandler)
-	mux.Handle("POST /logout", handler.verifyToken(http.HandlerFunc(handler.logoutHandler)))
+	mux.Handle("POST /logout", handler.AuthorizationMiddleware(http.HandlerFunc(handler.logoutHandler)))
+
+	mux.Handle("GET /secured", handler.AuthorizationMiddleware(http.HandlerFunc(handler.testSecuredEndpoint)))
+	mux.Handle("GET /admin-portal", handler.RequireRoleMiddleware("admin", http.HandlerFunc(handler.OnlyAdminsHandler)))
 
 	return mux
 }

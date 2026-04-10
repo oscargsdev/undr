@@ -3,13 +3,14 @@ package delivery
 import (
 	"errors"
 	"net/http"
+	"slices"
 	"strings"
 
 	"github.com/golang-jwt/jwt/v5"
 	"github.com/oscargsdev/undr/internal/modules/identity/service"
 )
 
-func (h *Handler) verifyToken(next http.Handler) http.Handler {
+func (h *Handler) AuthorizationMiddleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		// TODO: What does this do?
 		// w.Header().Add("Vary", "Authorization")
@@ -57,4 +58,19 @@ func (h *Handler) verifyToken(next http.Handler) http.Handler {
 		r = service.ContextSetClaims(r, token)
 		next.ServeHTTP(w, r)
 	})
+}
+
+func (h *Handler) RequireRoleMiddleware(code string, next http.Handler) http.Handler {
+	fn := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		roles := service.ContextGetRoles(r)
+
+		if !slices.Contains(roles, code) {
+			h.errorResponses.NotPermittedResponse(w, r)
+			return
+		}
+
+		next.ServeHTTP(w, r)
+	})
+
+	return h.AuthorizationMiddleware(http.HandlerFunc(fn))
 }
