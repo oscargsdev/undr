@@ -21,12 +21,12 @@ type Handler struct {
 	errorResponses *errorResponses.ErrorResponseHelper
 }
 
-func newRefreshTokenCookie(refreshToken string) *http.Cookie {
+func newRefreshTokenCookie(refreshToken string, expires time.Time) *http.Cookie {
 	return &http.Cookie{
 		Name:     "refresh_token",
 		Value:    refreshToken,
 		Path:     "/v1/identity/refresh",
-		Expires:  time.Now().Add(24 * time.Hour), // TODO: Change for var for token lifespan
+		Expires:  expires,
 		HttpOnly: true,
 		Secure:   true,
 		SameSite: http.SameSiteStrictMode,
@@ -126,7 +126,7 @@ func (h *Handler) activateUserHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	http.SetCookie(w, newRefreshTokenCookie(refreshToken))
+	http.SetCookie(w, newRefreshTokenCookie(refreshToken, time.Now().Add(24*time.Hour)))
 
 	err = jsonUtils.WriteJSON(w, http.StatusOK, jsonUtils.Envelope{"access_token": accessToken}, nil)
 	if err != nil {
@@ -177,7 +177,7 @@ func (h *Handler) authenticateUserHandler(w http.ResponseWriter, r *http.Request
 		return
 	}
 
-	http.SetCookie(w, newRefreshTokenCookie(refreshToken))
+	http.SetCookie(w, newRefreshTokenCookie(refreshToken, time.Now().Add(24*time.Hour)))
 
 	err = jsonUtils.WriteJSON(w, http.StatusOK, jsonUtils.Envelope{"access_token": accessToken}, nil)
 	if err != nil {
@@ -212,10 +212,24 @@ func (h *Handler) refreshTokenHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	http.SetCookie(w, newRefreshTokenCookie(refreshToken))
+	http.SetCookie(w, newRefreshTokenCookie(refreshToken, time.Now().Add(24*time.Hour)))
 
 	err = jsonUtils.WriteJSON(w, http.StatusOK, jsonUtils.Envelope{"access_token": accessToken}, nil)
 	if err != nil {
 		h.errorResponses.ServerErrorResponse(w, r, err)
 	}
+}
+
+func (h *Handler) logoutHandler(w http.ResponseWriter, r *http.Request) {
+	userId := service.ContextGetUserId(r)
+
+	err := h.service.Logout(userId)
+	if err != nil {
+		h.errorResponses.ServerErrorResponse(w, r, err)
+		return
+	}
+
+	http.SetCookie(w, newRefreshTokenCookie("", time.Unix(0, 0)))
+
+	w.WriteHeader(http.StatusNoContent)
 }

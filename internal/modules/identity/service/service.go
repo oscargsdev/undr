@@ -19,6 +19,7 @@ type IdentityService interface {
 	ActivateUser(tokenPlainText string) (refreshTokenString string, accessTokenString string, err error)
 	AuthenticateUser(email, password string) (refreshTokenString string, accessTokenString string, err error)
 	RefreshToken(oldRefreshToken string) (refreshTokenString string, accessTokenString string, err error)
+	Logout(userId int64) error
 }
 
 type identityService struct {
@@ -147,4 +148,9 @@ func (s *identityService) RefreshToken(oldRefreshToken string) (refreshTokenStri
 	}
 
 	return
+}
+
+func (s *identityService) Logout(userId int64) error {
+	err := s.repository.DeleteAllFromUser(domain.ScopeRefresh, userId)
+	return err
 }
