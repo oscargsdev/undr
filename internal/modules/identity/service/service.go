@@ -12,12 +12,14 @@ import (
 var (
 	ErrInvalidCredentials = errors.New("invalid credentials")
 	ErrUserNotActivated   = errors.New("user not activated")
+	ErrUserWithoutRoles   = errors.New("the user has no roles")
 )
 
 type IdentityService interface {
 	RegisterUser(user *domain.User) (*domain.OpaqueToken, error)
 	ActivateUser(tokenPlainText string) (refreshTokenString string, accessTokenString string, err error)
 	AuthenticateUser(email, password string) (refreshTokenString string, accessTokenString string, err error)
+	GetUserById(userId int64) (*UserDetails, error)
 	RefreshToken(oldRefreshToken string) (refreshTokenString string, accessTokenString string, err error)
 	Logout(userId int64) error
 }
@@ -169,4 +171,28 @@ func (s *identityService) RefreshToken(oldRefreshToken string) (refreshTokenStri
 func (s *identityService) Logout(userId int64) error {
 	err := s.repository.DeleteAllFromUser(domain.ScopeRefresh, userId)
 	return err
+}
+
+type UserDetails struct {
+	domain.User
+	domain.Roles `json:"roles"`
+}
+
+func (s *identityService) GetUserById(userId int64) (*UserDetails, error) {
+	user, err := s.repository.GetUserById(userId)
+	if err != nil {
+		return nil, err
+	}
+
+	roles, err := s.repository.GetAllRolesForUser(user.ID)
+	if err != nil {
+		return nil, ErrUserWithoutRoles
+	}
+
+	userDetails := UserDetails{
+		*user,
+		roles,
+	}
+
+	return &userDetails, nil
 }

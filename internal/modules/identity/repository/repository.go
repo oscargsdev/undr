@@ -20,6 +20,7 @@ type IdentityRepository interface {
 	GetForOpaqueToken(tokenScope, tokenPlaintext string) (*domain.User, error)
 	DeleteAllFromUser(scope string, userID int64) error
 	GetUserByEmail(email string) (*domain.User, error)
+	GetUserById(userId int64) (*domain.User, error)
 	GetAllRolesForUser(userID int64) (domain.Roles, error)
 	AddRoleForUser(userID int64, codes ...string) error
 }
@@ -115,6 +116,39 @@ func (r *Repository) GetUserByEmail(email string) (*domain.User, error) {
 	defer cancel()
 
 	err := r.db.QueryRowContext(ctx, query, email).Scan(
+		&user.ID,
+		&user.CreatedAt,
+		&user.Username,
+		&user.Email,
+		&user.Password.Hash,
+		&user.Activated,
+		&user.Version,
+	)
+
+	if err != nil {
+		switch {
+		case errors.Is(err, sql.ErrNoRows):
+			return nil, ErrRecordNotFound
+		default:
+			return nil, err
+		}
+	}
+
+	return &user, nil
+}
+
+func (r *Repository) GetUserById(userId int64) (*domain.User, error) {
+	query := `
+        SELECT id, created_at, username, email, password_hash, activated, version
+        FROM users
+        WHERE id = $1`
+
+	var user domain.User
+
+	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+	defer cancel()
+
+	err := r.db.QueryRowContext(ctx, query, userId).Scan(
 		&user.ID,
 		&user.CreatedAt,
 		&user.Username,

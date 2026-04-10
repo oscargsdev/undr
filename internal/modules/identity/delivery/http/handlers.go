@@ -4,6 +4,7 @@ import (
 	"errors"
 	"log/slog"
 	"net/http"
+	"strconv"
 	"time"
 
 	"github.com/oscargsdev/undr/internal/common/validator"
@@ -236,4 +237,37 @@ func (h *Handler) logoutHandler(w http.ResponseWriter, r *http.Request) {
 
 func (h *Handler) OnlyAdminsHandler(w http.ResponseWriter, r *http.Request) {
 	jsonUtils.WriteJSON(w, http.StatusOK, jsonUtils.Envelope{"howdy": "you are an admin!"}, nil)
+}
+
+func (h *Handler) MyInfoHandler(w http.ResponseWriter, r *http.Request) {
+	pathUserId, err := strconv.ParseInt(r.PathValue("userId"), 10, 64)
+	if err != nil {
+		h.errorResponses.BadRequestResponse(w, r, err)
+		return
+	}
+
+	contextUserId := service.ContextGetUserId(r)
+
+	if pathUserId != contextUserId {
+		h.errorResponses.InvalidCredentialsResponse(w, r)
+		return
+	}
+
+	user, err := h.service.GetUserById(contextUserId)
+	if err != nil {
+		switch {
+		case errors.Is(err, repository.ErrRecordNotFound):
+			h.errorResponses.NotFoundResponse(w, r)
+		case errors.Is(err, service.ErrUserWithoutRoles):
+			panic("user has no roles, should have at least 1")
+		default:
+			h.errorResponses.ServerErrorResponse(w, r, err)
+		}
+		return
+	}
+
+	err = jsonUtils.WriteJSON(w, http.StatusOK, jsonUtils.Envelope{"user_details": user}, nil)
+	if err != nil {
+		h.errorResponses.ServerErrorResponse(w, r, err)
+	}
 }

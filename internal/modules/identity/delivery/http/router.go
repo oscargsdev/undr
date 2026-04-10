@@ -15,6 +15,7 @@ func NewRouter(handler Handler) http.Handler {
 
 	mux.Handle("GET /secured", handler.AuthorizationMiddleware(http.HandlerFunc(handler.testSecuredEndpoint)))
 	mux.Handle("GET /admin-portal", handler.RequireRoleMiddleware("admin", http.HandlerFunc(handler.OnlyAdminsHandler)))
+	mux.Handle("GET /users/{userId}", handler.AuthorizationMiddleware(http.HandlerFunc(handler.MyInfoHandler)))
 
 	return mux
 }
