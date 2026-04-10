@@ -136,8 +136,8 @@ func (h *Handler) activateUserHandler(w http.ResponseWriter, r *http.Request) {
 
 func (h *Handler) testSecuredEndpoint(w http.ResponseWriter, r *http.Request) {
 	userId := service.ContextGetUserId(r)
-	permissions := service.ContextGetPermissions(r)
-	jsonUtils.WriteJSON(w, http.StatusOK, jsonUtils.Envelope{"userId": userId, "permissions": permissions}, nil)
+	roles := service.ContextGetRoles(r)
+	jsonUtils.WriteJSON(w, http.StatusOK, jsonUtils.Envelope{"userId": userId, "roles": roles}, nil)
 }
 
 func (h *Handler) authenticateUserHandler(w http.ResponseWriter, r *http.Request) {

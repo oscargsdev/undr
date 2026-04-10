@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/golang-jwt/jwt/v5"
+	"github.com/oscargsdev/undr/internal/modules/identity/domain"
 )
 
 // TODO:  Get the signing key from env
@@ -16,24 +17,18 @@ var mySigningKey = []byte("AllYourBase")
 var ErrUnknownClaims = errors.New("unknown claims")
 
 type claims struct {
-	Roles       []string `json:"roles"`
-	Permissions []string `json:"permissions"`
+	Roles []string `json:"roles"`
 	jwt.RegisteredClaims
 }
 
 type contextKey string
 
 const userIdContextKey = contextKey("userId")
-const permissionsContextkey = contextKey("permissions")
+const rolesContextKey = contextKey("roles")
 
-func newAccessToken(userID int64) (string, error) {
+func newAccessToken(userID int64, roles domain.Roles) (string, error) {
 	claims := claims{
-		Roles: []string{
-			"projectAdmin",
-		},
-		Permissions: []string{
-			"readProjects",
-		},
+		Roles: roles,
 		RegisteredClaims: jwt.RegisteredClaims{
 			ExpiresAt: jwt.NewNumericDate(time.Now().Add(15 * time.Minute)),
 			Issuer:    "undr-auth",
@@ -76,10 +71,10 @@ func ValidateJWTToken(tokenString string) (*jwt.Token, error) {
 
 func ContextSetClaims(r *http.Request, token *jwt.Token) *http.Request {
 	userId, _ := token.Claims.GetSubject()
-	permissions := token.Claims.(*claims).Permissions
+	roles := token.Claims.(*claims).Roles
 
 	ctx := context.WithValue(r.Context(), userIdContextKey, userId)
-	ctx = context.WithValue(ctx, permissionsContextkey, permissions)
+	ctx = context.WithValue(ctx, rolesContextKey, roles)
 
 	return r.WithContext(ctx)
 }
@@ -94,11 +89,11 @@ func ContextGetUserId(r *http.Request) int64 {
 	return id
 }
 
-func ContextGetPermissions(r *http.Request) []string {
-	permissions, ok := r.Context().Value(permissionsContextkey).([]string)
+func ContextGetRoles(r *http.Request) []string {
+	roles, ok := r.Context().Value(rolesContextKey).([]string)
 	if !ok {
-		panic("missing permissions value in request")
+		panic("missing roles value in request")
 	}
 
-	return permissions
+	return roles
 }

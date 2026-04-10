@@ -40,21 +40,27 @@ func (s *identityService) RegisterUser(user *domain.User) (*domain.OpaqueToken, 
 		return nil, err
 	}
 
-	// TODO: domain call to insert permission
+	err = s.repository.AddRoleForUser(user.ID, "user")
+	if err != nil {
+		return nil, err
+	}
 
-	token, err := s.repository.NewOpaqueToken(user.ID, 3*24*time.Hour, domain.ScopeActivation)
+	activationToken, err := s.repository.NewOpaqueToken(user.ID, 3*24*time.Hour, domain.ScopeActivation)
 	if err != nil {
 		return nil, err
 	}
 
 	// EVENT: userRegistered
-	// TODO: generate email to send to user
-
-	return token, nil
+	return activationToken, nil
 }
 
 func (s *identityService) ActivateUser(tokenPlainText string) (refreshTokenString string, accessTokenString string, err error) {
 	user, err := s.repository.GetForOpaqueToken(domain.ScopeActivation, tokenPlainText)
+	if err != nil {
+		return "", "", err
+	}
+
+	roles, err := s.repository.GetAllRolesForUser(user.ID)
 	if err != nil {
 		return "", "", err
 	}
@@ -77,7 +83,7 @@ func (s *identityService) ActivateUser(tokenPlainText string) (refreshTokenStrin
 	}
 	refreshTokenString = refreshToken.Plaintext
 
-	accessTokenString, err = newAccessToken(user.ID)
+	accessTokenString, err = newAccessToken(user.ID, roles)
 	if err != nil {
 		return "", "", err
 	}
@@ -88,6 +94,11 @@ func (s *identityService) ActivateUser(tokenPlainText string) (refreshTokenStrin
 
 func (s *identityService) AuthenticateUser(email, password string) (refreshTokenString string, accessTokenString string, err error) {
 	user, err := s.repository.GetUserByEmail(email)
+	if err != nil {
+		return "", "", err
+	}
+
+	roles, err := s.repository.GetAllRolesForUser(user.ID)
 	if err != nil {
 		return "", "", err
 	}
@@ -116,7 +127,7 @@ func (s *identityService) AuthenticateUser(email, password string) (refreshToken
 	}
 	refreshTokenString = refreshToken.Plaintext
 
-	accessTokenString, err = newAccessToken(user.ID)
+	accessTokenString, err = newAccessToken(user.ID, roles)
 	if err != nil {
 		return "", "", err
 	}
@@ -127,6 +138,11 @@ func (s *identityService) AuthenticateUser(email, password string) (refreshToken
 
 func (s *identityService) RefreshToken(oldRefreshToken string) (refreshTokenString string, accessTokenString string, err error) {
 	user, err := s.repository.GetForOpaqueToken(domain.ScopeRefresh, oldRefreshToken)
+	if err != nil {
+		return "", "", err
+	}
+
+	roles, err := s.repository.GetAllRolesForUser(user.ID)
 	if err != nil {
 		return "", "", err
 	}
@@ -142,7 +158,7 @@ func (s *identityService) RefreshToken(oldRefreshToken string) (refreshTokenStri
 	}
 	refreshTokenString = refreshToken.Plaintext
 
-	accessTokenString, err = newAccessToken(user.ID)
+	accessTokenString, err = newAccessToken(user.ID, roles)
 	if err != nil {
 		return "", "", err
 	}
