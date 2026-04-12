@@ -25,15 +25,17 @@ type IdentityRepository interface {
 	AddRoleForUser(userID int64, codes ...string) error
 }
 
-type Repository struct {
-	db     *sql.DB
-	logger *slog.Logger
+type repository struct {
+	db        *sql.DB
+	dbTimeout time.Duration
+	logger    *slog.Logger
 }
 
-func NewRepository(db *sql.DB, logger *slog.Logger) *Repository {
-	return &Repository{
-		db:     db,
-		logger: logger,
+func NewRepository(db *sql.DB, dbTimeout time.Duration, logger *slog.Logger) *repository {
+	return &repository{
+		db:        db,
+		dbTimeout: dbTimeout,
+		logger:    logger,
 	}
 }
 
@@ -44,7 +46,7 @@ var (
 	ErrEditConflict      = errors.New("edit conflict")
 )
 
-func (r *Repository) InsertUser(user *domain.User) error {
+func (r *repository) InsertUser(user *domain.User) error {
 	query := `
         INSERT INTO users (username, email, password_hash, activated) 
         VALUES ($1, $2, $3, $4)
@@ -52,7 +54,7 @@ func (r *Repository) InsertUser(user *domain.User) error {
 
 	args := []any{user.Username, user.Email, user.Password.Hash, user.Activated}
 
-	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), r.dbTimeout)
 	defer cancel()
 
 	err := r.db.QueryRowContext(ctx, query, args...).Scan(&user.ID, &user.CreatedAt, &user.Version)
@@ -70,7 +72,7 @@ func (r *Repository) InsertUser(user *domain.User) error {
 	return nil
 }
 
-func (r *Repository) UpdateUser(user *domain.User) error {
+func (r *repository) UpdateUser(user *domain.User) error {
 	query := `
         UPDATE users 
         SET username = $1, email = $2, password_hash = $3, activated = $4, version = version + 1
@@ -86,7 +88,7 @@ func (r *Repository) UpdateUser(user *domain.User) error {
 		user.Version,
 	}
 
-	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), r.dbTimeout)
 	defer cancel()
 
 	err := r.db.QueryRowContext(ctx, query, args...).Scan(&user.Version)
@@ -104,7 +106,7 @@ func (r *Repository) UpdateUser(user *domain.User) error {
 	return nil
 }
 
-func (r *Repository) GetUserByEmail(email string) (*domain.User, error) {
+func (r *repository) GetUserByEmail(email string) (*domain.User, error) {
 	query := `
         SELECT id, created_at, username, email, password_hash, activated, version
         FROM users
@@ -112,7 +114,7 @@ func (r *Repository) GetUserByEmail(email string) (*domain.User, error) {
 
 	var user domain.User
 
-	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), r.dbTimeout)
 	defer cancel()
 
 	err := r.db.QueryRowContext(ctx, query, email).Scan(
@@ -137,7 +139,7 @@ func (r *Repository) GetUserByEmail(email string) (*domain.User, error) {
 	return &user, nil
 }
 
-func (r *Repository) GetUserById(userId int64) (*domain.User, error) {
+func (r *repository) GetUserById(userId int64) (*domain.User, error) {
 	query := `
         SELECT id, created_at, username, email, password_hash, activated, version
         FROM users
@@ -145,7 +147,7 @@ func (r *Repository) GetUserById(userId int64) (*domain.User, error) {
 
 	var user domain.User
 
-	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), r.dbTimeout)
 	defer cancel()
 
 	err := r.db.QueryRowContext(ctx, query, userId).Scan(
@@ -184,28 +186,28 @@ func generateOpaqueToken(userID int64, ttl time.Duration, scope string) *domain.
 	return token
 }
 
-func (r *Repository) InsertOpaqueToken(token *domain.OpaqueToken) error {
+func (r *repository) InsertOpaqueToken(token *domain.OpaqueToken) error {
 	query := `
         INSERT INTO tokens (hash, user_id, expiry, scope) 
         VALUES ($1, $2, $3, $4)`
 
 	args := []any{token.Hash, token.UserID, token.Expiry, token.Scope}
 
-	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), r.dbTimeout)
 	defer cancel()
 
 	_, err := r.db.ExecContext(ctx, query, args...)
 	return err
 }
 
-func (r *Repository) NewOpaqueToken(userID int64, ttl time.Duration, scope string) (*domain.OpaqueToken, error) {
+func (r *repository) NewOpaqueToken(userID int64, ttl time.Duration, scope string) (*domain.OpaqueToken, error) {
 	token := generateOpaqueToken(userID, ttl, scope)
 
 	err := r.InsertOpaqueToken(token)
 	return token, err
 }
 
-func (r *Repository) GetForOpaqueToken(tokenScope, tokenPlaintext string) (*domain.User, error) {
+func (r *repository) GetForOpaqueToken(tokenScope, tokenPlaintext string) (*domain.User, error) {
 	tokenHash := sha256.Sum256([]byte(tokenPlaintext))
 
 	query := `
@@ -221,7 +223,7 @@ func (r *Repository) GetForOpaqueToken(tokenScope, tokenPlaintext string) (*doma
 
 	var user domain.User
 
-	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), r.dbTimeout)
 	defer cancel()
 
 	err := r.db.QueryRowContext(ctx, query, args...).Scan(
@@ -245,19 +247,19 @@ func (r *Repository) GetForOpaqueToken(tokenScope, tokenPlaintext string) (*doma
 	return &user, nil
 }
 
-func (r *Repository) DeleteAllFromUser(scope string, userID int64) error {
+func (r *repository) DeleteAllFromUser(scope string, userID int64) error {
 	query := `
         DELETE FROM tokens 
         WHERE scope = $1 AND user_id = $2`
 
-	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), r.dbTimeout)
 	defer cancel()
 
 	_, err := r.db.ExecContext(ctx, query, scope, userID)
 	return err
 }
 
-func (r *Repository) GetAllRolesForUser(userID int64) (domain.Roles, error) {
+func (r *repository) GetAllRolesForUser(userID int64) (domain.Roles, error) {
 	query := `
 		SELECT roles.code
 		FROM roles
@@ -265,7 +267,7 @@ func (r *Repository) GetAllRolesForUser(userID int64) (domain.Roles, error) {
 		INNER JOIN users ON users_roles.user_id = users.id
 		WHERE users.id = $1`
 
-	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), r.dbTimeout)
 	defer cancel()
 
 	rows, err := r.db.QueryContext(ctx, query, userID)
@@ -293,12 +295,12 @@ func (r *Repository) GetAllRolesForUser(userID int64) (domain.Roles, error) {
 	return roles, nil
 }
 
-func (r *Repository) AddRoleForUser(userID int64, codes ...string) error {
+func (r *repository) AddRoleForUser(userID int64, codes ...string) error {
 	query := `
         INSERT INTO users_roles
         SELECT $1, roles.id FROM roles WHERE roles.code = ANY($2)`
 
-	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), r.dbTimeout)
 	defer cancel()
 
 	_, err := r.db.ExecContext(ctx, query, userID, pq.Array(codes))

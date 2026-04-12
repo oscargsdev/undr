@@ -4,6 +4,7 @@ import (
 	"database/sql"
 	"log/slog"
 	"net/http"
+	"time"
 
 	delivery "github.com/oscargsdev/undr/internal/modules/identity/delivery/http"
 	"github.com/oscargsdev/undr/internal/modules/identity/repository"
@@ -12,15 +13,34 @@ import (
 
 type Module struct {
 	Router http.Handler
-	logger *slog.Logger
 }
 
-func New(db *sql.DB, logger *slog.Logger) *Module {
+type Config struct {
+	DB                   *sql.DB
+	Logger               *slog.Logger
+	Issuer               string
+	JWTExpiration        time.Duration
+	RefreshExpiration    time.Duration
+	ActivationExpiration time.Duration
+	DBTimeout            time.Duration
+}
+
+func New(cfg Config) *Module {
 	module := &Module{}
 
-	repo := repository.NewRepository(db, logger)
-	svc := service.New(repo, logger)
-	handler := delivery.NewHandler(svc, logger)
+	repo := repository.NewRepository(cfg.DB, cfg.DBTimeout, cfg.Logger)
+
+	svcConfig := service.Config{
+		Repository:           repo,
+		Logger:               cfg.Logger,
+		Issuer:               cfg.Issuer,
+		JWTExpiration:        cfg.JWTExpiration,
+		RefreshExpiration:    cfg.RefreshExpiration,
+		ActivationExpiration: cfg.ActivationExpiration,
+	}
+	svc := service.New(svcConfig)
+
+	handler := delivery.NewHandler(svc, cfg.Logger)
 	router := delivery.NewRouter(*handler)
 
 	module.Router = router

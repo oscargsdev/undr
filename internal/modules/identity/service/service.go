@@ -9,12 +9,6 @@ import (
 	"github.com/oscargsdev/undr/internal/modules/identity/repository"
 )
 
-var (
-	ErrInvalidCredentials = errors.New("invalid credentials")
-	ErrUserNotActivated   = errors.New("user not activated")
-	ErrUserWithoutRoles   = errors.New("the user has no roles")
-)
-
 type IdentityService interface {
 	RegisterUser(user *domain.User) (*domain.OpaqueToken, error)
 	ActivateUser(tokenPlainText string) (refreshTokenString string, accessTokenString string, err error)
@@ -22,32 +16,46 @@ type IdentityService interface {
 	GetUserById(userId int64) (*UserDetails, error)
 	RefreshToken(oldRefreshToken string) (refreshTokenString string, accessTokenString string, err error)
 	Logout(userId int64) error
+	GetIssuer() string
+}
+
+var (
+	ErrInvalidCredentials = errors.New("invalid credentials")
+	ErrUserNotActivated   = errors.New("user not activated")
+	ErrUserWithoutRoles   = errors.New("the user has no roles")
+)
+
+type Config struct {
+	Repository           repository.IdentityRepository
+	Logger               *slog.Logger
+	Issuer               string
+	JWTExpiration        time.Duration
+	RefreshExpiration    time.Duration
+	ActivationExpiration time.Duration
 }
 
 type identityService struct {
-	repository repository.IdentityRepository
-	logger     *slog.Logger
+	cfg Config
 }
 
-func New(repository repository.IdentityRepository, logger *slog.Logger) *identityService {
+func New(cfg Config) *identityService {
 	return &identityService{
-		repository: repository,
-		logger:     logger,
+		cfg: cfg,
 	}
 }
 
 func (s *identityService) RegisterUser(user *domain.User) (*domain.OpaqueToken, error) {
-	err := s.repository.InsertUser(user)
+	err := s.cfg.Repository.InsertUser(user)
 	if err != nil {
 		return nil, err
 	}
 
-	err = s.repository.AddRoleForUser(user.ID, "user")
+	err = s.cfg.Repository.AddRoleForUser(user.ID, "user")
 	if err != nil {
 		return nil, err
 	}
 
-	activationToken, err := s.repository.NewOpaqueToken(user.ID, 3*24*time.Hour, domain.ScopeActivation)
+	activationToken, err := s.cfg.Repository.NewOpaqueToken(user.ID, s.cfg.ActivationExpiration, domain.ScopeActivation)
 	if err != nil {
 		return nil, err
 	}
@@ -57,35 +65,35 @@ func (s *identityService) RegisterUser(user *domain.User) (*domain.OpaqueToken, 
 }
 
 func (s *identityService) ActivateUser(tokenPlainText string) (refreshTokenString string, accessTokenString string, err error) {
-	user, err := s.repository.GetForOpaqueToken(domain.ScopeActivation, tokenPlainText)
+	user, err := s.cfg.Repository.GetForOpaqueToken(domain.ScopeActivation, tokenPlainText)
 	if err != nil {
 		return "", "", err
 	}
 
-	roles, err := s.repository.GetAllRolesForUser(user.ID)
+	roles, err := s.cfg.Repository.GetAllRolesForUser(user.ID)
 	if err != nil {
 		return "", "", err
 	}
 
 	user.Activated = true
 
-	err = s.repository.UpdateUser(user)
+	err = s.cfg.Repository.UpdateUser(user)
 	if err != nil {
 		return "", "", err
 	}
 
-	err = s.repository.DeleteAllFromUser(domain.ScopeActivation, user.ID)
+	err = s.cfg.Repository.DeleteAllFromUser(domain.ScopeActivation, user.ID)
 	if err != nil {
 		return "", "", err
 	}
 
-	refreshToken, err := s.repository.NewOpaqueToken(user.ID, 24*time.Hour, domain.ScopeRefresh)
+	refreshToken, err := s.cfg.Repository.NewOpaqueToken(user.ID, s.cfg.RefreshExpiration, domain.ScopeRefresh)
 	if err != nil {
 		return "", "", err
 	}
 	refreshTokenString = refreshToken.Plaintext
 
-	accessTokenString, err = newAccessToken(user.ID, roles)
+	accessTokenString, err = newAccessToken(user.ID, roles, s.cfg.JWTExpiration, s.cfg.Issuer)
 	if err != nil {
 		return "", "", err
 	}
@@ -95,12 +103,12 @@ func (s *identityService) ActivateUser(tokenPlainText string) (refreshTokenStrin
 }
 
 func (s *identityService) AuthenticateUser(email, password string) (refreshTokenString string, accessTokenString string, err error) {
-	user, err := s.repository.GetUserByEmail(email)
+	user, err := s.cfg.Repository.GetUserByEmail(email)
 	if err != nil {
 		return "", "", err
 	}
 
-	roles, err := s.repository.GetAllRolesForUser(user.ID)
+	roles, err := s.cfg.Repository.GetAllRolesForUser(user.ID)
 	if err != nil {
 		return "", "", err
 	}
@@ -118,18 +126,18 @@ func (s *identityService) AuthenticateUser(email, password string) (refreshToken
 		return "", "", ErrUserNotActivated
 	}
 
-	err = s.repository.DeleteAllFromUser(domain.ScopeRefresh, user.ID)
+	err = s.cfg.Repository.DeleteAllFromUser(domain.ScopeRefresh, user.ID)
 	if err != nil {
 		return "", "", err
 	}
 
-	refreshToken, err := s.repository.NewOpaqueToken(user.ID, 24*time.Hour, domain.ScopeRefresh)
+	refreshToken, err := s.cfg.Repository.NewOpaqueToken(user.ID, s.cfg.RefreshExpiration, domain.ScopeRefresh)
 	if err != nil {
 		return "", "", err
 	}
 	refreshTokenString = refreshToken.Plaintext
 
-	accessTokenString, err = newAccessToken(user.ID, roles)
+	accessTokenString, err = newAccessToken(user.ID, roles, s.cfg.JWTExpiration, s.cfg.Issuer)
 	if err != nil {
 		return "", "", err
 	}
@@ -139,28 +147,28 @@ func (s *identityService) AuthenticateUser(email, password string) (refreshToken
 }
 
 func (s *identityService) RefreshToken(oldRefreshToken string) (refreshTokenString string, accessTokenString string, err error) {
-	user, err := s.repository.GetForOpaqueToken(domain.ScopeRefresh, oldRefreshToken)
+	user, err := s.cfg.Repository.GetForOpaqueToken(domain.ScopeRefresh, oldRefreshToken)
 	if err != nil {
 		return "", "", err
 	}
 
-	roles, err := s.repository.GetAllRolesForUser(user.ID)
+	roles, err := s.cfg.Repository.GetAllRolesForUser(user.ID)
 	if err != nil {
 		return "", "", err
 	}
 
-	err = s.repository.DeleteAllFromUser(domain.ScopeRefresh, user.ID)
+	err = s.cfg.Repository.DeleteAllFromUser(domain.ScopeRefresh, user.ID)
 	if err != nil {
 		return "", "", err
 	}
 
-	refreshToken, err := s.repository.NewOpaqueToken(user.ID, 24*time.Hour, domain.ScopeRefresh)
+	refreshToken, err := s.cfg.Repository.NewOpaqueToken(user.ID, s.cfg.RefreshExpiration, domain.ScopeRefresh)
 	if err != nil {
 		return "", "", err
 	}
 	refreshTokenString = refreshToken.Plaintext
 
-	accessTokenString, err = newAccessToken(user.ID, roles)
+	accessTokenString, err = newAccessToken(user.ID, roles, s.cfg.JWTExpiration, s.cfg.Issuer)
 	if err != nil {
 		return "", "", err
 	}
@@ -169,7 +177,7 @@ func (s *identityService) RefreshToken(oldRefreshToken string) (refreshTokenStri
 }
 
 func (s *identityService) Logout(userId int64) error {
-	err := s.repository.DeleteAllFromUser(domain.ScopeRefresh, userId)
+	err := s.cfg.Repository.DeleteAllFromUser(domain.ScopeRefresh, userId)
 	return err
 }
 
@@ -179,12 +187,12 @@ type UserDetails struct {
 }
 
 func (s *identityService) GetUserById(userId int64) (*UserDetails, error) {
-	user, err := s.repository.GetUserById(userId)
+	user, err := s.cfg.Repository.GetUserById(userId)
 	if err != nil {
 		return nil, err
 	}
 
-	roles, err := s.repository.GetAllRolesForUser(user.ID)
+	roles, err := s.cfg.Repository.GetAllRolesForUser(user.ID)
 	if err != nil {
 		return nil, ErrUserWithoutRoles
 	}
@@ -195,4 +203,8 @@ func (s *identityService) GetUserById(userId int64) (*UserDetails, error) {
 	}
 
 	return &userDetails, nil
+}
+
+func (s *identityService) GetIssuer() string {
+	return s.cfg.Issuer
 }

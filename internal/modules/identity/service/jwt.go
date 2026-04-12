@@ -13,7 +13,8 @@ import (
 
 // TODO:  Get the signing key from env, CONFIG struct
 var mySigningKey = []byte("AllYourBase")
-var issuer = "undr-auth"
+
+// var issuer = "undr-auth"
 
 var ErrUnknownClaims = errors.New("unknown claims")
 
@@ -27,11 +28,11 @@ type contextKey string
 const userIdContextKey = contextKey("userId")
 const rolesContextKey = contextKey("roles")
 
-func newAccessToken(userID int64, roles domain.Roles) (string, error) {
+func newAccessToken(userID int64, roles domain.Roles, expiration time.Duration, issuer string) (string, error) {
 	claims := claims{
 		Roles: roles,
 		RegisteredClaims: jwt.RegisteredClaims{
-			ExpiresAt: jwt.NewNumericDate(time.Now().Add(15 * time.Minute)),
+			ExpiresAt: jwt.NewNumericDate(time.Now().Add(expiration)),
 			Issuer:    issuer,
 			Subject:   strconv.FormatInt(userID, 10),
 		},
@@ -48,7 +49,7 @@ func newAccessToken(userID int64, roles domain.Roles) (string, error) {
 	return tokenString, nil
 }
 
-func ValidateJWTToken(tokenString string) (*jwt.Token, error) {
+func ValidateJWTToken(tokenString string, issuer string) (*jwt.Token, error) {
 	fn := func(token *jwt.Token) (any, error) {
 		return []byte("AllYourBase"), nil
 	}

@@ -56,7 +56,17 @@ func main() {
 	defer db.Close()
 	logger.Info("database connection pool established")
 
-	identityModule := identity.New(db, logger)
+	identityConfig := identity.Config{
+		DB:                   db,
+		Logger:               logger,
+		Issuer:               "undr-auth",
+		JWTExpiration:        15 * time.Minute,
+		RefreshExpiration:    24 * time.Hour,
+		ActivationExpiration: 3 * 24 * time.Hour,
+		DBTimeout:            3 * time.Second,
+	}
+
+	identityModule := identity.New(identityConfig)
 
 	app := &application{
 		config:         cfg,
