@@ -11,8 +11,9 @@ import (
 	"github.com/oscargsdev/undr/internal/modules/identity/domain"
 )
 
-// TODO:  Get the signing key from env
+// TODO:  Get the signing key from env, CONFIG struct
 var mySigningKey = []byte("AllYourBase")
+var issuer = "undr-auth"
 
 var ErrUnknownClaims = errors.New("unknown claims")
 
@@ -31,7 +32,7 @@ func newAccessToken(userID int64, roles domain.Roles) (string, error) {
 		Roles: roles,
 		RegisteredClaims: jwt.RegisteredClaims{
 			ExpiresAt: jwt.NewNumericDate(time.Now().Add(15 * time.Minute)),
-			Issuer:    "undr-auth",
+			Issuer:    issuer,
 			Subject:   strconv.FormatInt(userID, 10),
 		},
 	}
@@ -48,20 +49,16 @@ func newAccessToken(userID int64, roles domain.Roles) (string, error) {
 }
 
 func ValidateJWTToken(tokenString string) (*jwt.Token, error) {
-	// TODO: What dows this validate exactly?
-	token, err := jwt.ParseWithClaims(tokenString, &claims{}, func(token *jwt.Token) (any, error) {
+	fn := func(token *jwt.Token) (any, error) {
 		return []byte("AllYourBase"), nil
-	})
+	}
+
+	token, err := jwt.ParseWithClaims(tokenString, &claims{}, fn, jwt.WithIssuer(issuer), jwt.WithValidMethods([]string{jwt.SigningMethodHS256.Name}))
 
 	if !token.Valid {
 		return nil, err
 	}
 
-	//TODO: What else needs to be validated? Create custom errors and handle them in handler
-
-	//TODO: Validate issuer? Issuer name in env var?
-
-	// TODO: What to do here? Return claims to put in request context?
 	if _, ok := token.Claims.(*claims); ok {
 		return token, nil
 	} else {
