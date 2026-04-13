@@ -25,6 +25,26 @@ type Config struct {
 	DBTimeout            time.Duration
 }
 
+func NewConfig(db *sql.DB, logger *slog.Logger, flagConfig FlagConfig) Config {
+	return Config{
+		DB:                   db,
+		Logger:               logger,
+		Issuer:               flagConfig.Issuer,
+		JWTExpiration:        time.Duration(flagConfig.JWTExpiration) * time.Minute,
+		RefreshExpiration:    time.Duration(flagConfig.RefreshExpiration) * time.Hour,
+		ActivationExpiration: time.Duration(flagConfig.ActivationExpiration) * 24 * time.Hour,
+		DBTimeout:            time.Duration(flagConfig.DBTimeout) * time.Second,
+	}
+}
+
+type FlagConfig struct {
+	Issuer               string
+	JWTExpiration        int // in minutes
+	RefreshExpiration    int // in hours
+	ActivationExpiration int // in days
+	DBTimeout            int // in seconds
+}
+
 func New(cfg Config) *Module {
 	module := &Module{}
 

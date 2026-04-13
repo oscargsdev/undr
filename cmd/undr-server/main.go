@@ -34,6 +34,7 @@ type application struct {
 
 func main() {
 	var cfg config
+	var identityFlags identity.FlagConfig
 
 	flag.IntVar(&cfg.port, "port", 4000, "API Server Port")
 	flag.StringVar(&cfg.env, "env", "development", "Environment (development|staging|production)")
@@ -43,6 +44,12 @@ func main() {
 	flag.IntVar(&cfg.db.maxOpenConns, "db-max-open-conns", 25, "PostgreSQL max open connections")
 	flag.IntVar(&cfg.db.maxIdleConns, "db-max-idle-conns", 25, "PostgreSQL max idle connections")
 	flag.DurationVar(&cfg.db.maxIdleTime, "db-max-idle-time", 15*time.Minute, "PostgreSQL max connection idle time")
+
+	flag.StringVar(&identityFlags.Issuer, "identity-issuer", "undr-auth", "identity token issuer name")
+	flag.IntVar(&identityFlags.JWTExpiration, "jwt-expiration", 15, "JWT token expiration time in minutes")
+	flag.IntVar(&identityFlags.RefreshExpiration, "refresh-token-expiration", 24, "refresh token expiration time in hours")
+	flag.IntVar(&identityFlags.ActivationExpiration, "activation-expiration", 3, "activation token expiration time in days")
+	flag.IntVar(&identityFlags.DBTimeout, "db-timeout", 3, "db timeout in seconds")
 
 	flag.Parse()
 
@@ -56,17 +63,8 @@ func main() {
 	defer db.Close()
 	logger.Info("database connection pool established")
 
-	identityConfig := identity.Config{
-		DB:                   db,
-		Logger:               logger,
-		Issuer:               "undr-auth",
-		JWTExpiration:        15 * time.Minute,
-		RefreshExpiration:    24 * time.Hour,
-		ActivationExpiration: 3 * 24 * time.Hour,
-		DBTimeout:            3 * time.Second,
-	}
-
-	identityModule := identity.New(identityConfig)
+	identityCfg := identity.NewConfig(db, logger, identityFlags)
+	identityModule := identity.New(identityCfg)
 
 	app := &application{
 		config:         cfg,
