@@ -1,8 +1,10 @@
 package service
 
 import (
+	"encoding/json"
 	"errors"
 	"log/slog"
+	"net/http"
 	"time"
 
 	"github.com/oscargsdev/undr/internal/modules/identity/domain"
@@ -17,6 +19,7 @@ type IdentityService interface {
 	RefreshToken(oldRefreshToken string) (refreshTokenString string, accessTokenString string, err error)
 	Logout(userId int64) error
 	GetIssuer() string
+	GetJWKS(r *http.Request) (json.RawMessage, error)
 }
 
 var (
@@ -39,9 +42,16 @@ type identityService struct {
 }
 
 func New(cfg Config) *identityService {
-	return &identityService{
+	identityService := &identityService{
 		cfg: cfg,
 	}
+
+	err := identityService.initJWKS()
+	if err != nil {
+		panic("failed to init JWKS")
+	}
+
+	return identityService
 }
 
 func (s *identityService) RegisterUser(user *domain.User) (*domain.OpaqueToken, error) {
@@ -207,4 +217,15 @@ func (s *identityService) GetUserById(userId int64) (*UserDetails, error) {
 
 func (s *identityService) GetIssuer() string {
 	return s.cfg.Issuer
+}
+
+var ErrJWKJSON = errors.New("failed to get JWK Set JSON")
+
+func (s *identityService) GetJWKS(r *http.Request) (json.RawMessage, error) {
+	response, err := jwkStore.JSONPublic(r.Context())
+	if err != nil {
+		return nil, ErrJWKJSON
+	}
+
+	return response, nil
 }

@@ -17,5 +17,7 @@ func NewRouter(handler Handler) http.Handler {
 	mux.Handle("GET /admin-portal", handler.RequireRoleMiddleware("admin", http.HandlerFunc(handler.OnlyAdminsHandler)))
 	mux.Handle("GET /users/{userId}", handler.AuthorizationMiddleware(http.HandlerFunc(handler.MyInfoHandler)))
 
+	mux.HandleFunc("GET /jwks.json", handler.JWKS)
+
 	return mux
 }

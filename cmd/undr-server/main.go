@@ -49,7 +49,7 @@ func main() {
 	flag.IntVar(&identityFlags.JWTExpiration, "jwt-expiration", 15, "JWT token expiration time in minutes")
 	flag.IntVar(&identityFlags.RefreshExpiration, "refresh-token-expiration", 24, "refresh token expiration time in hours")
 	flag.IntVar(&identityFlags.ActivationExpiration, "activation-expiration", 3, "activation token expiration time in days")
-	flag.IntVar(&identityFlags.DBTimeout, "db-timeout", 3, "db timeout in seconds")
+	flag.IntVar(&identityFlags.DBTimeout, "db-timeout", 3, "db timeout in seconds") // Maybe global flag for other services
 
 	flag.Parse()
 

@@ -271,3 +271,16 @@ func (h *Handler) MyInfoHandler(w http.ResponseWriter, r *http.Request) {
 		h.errorResponses.ServerErrorResponse(w, r, err)
 	}
 }
+
+func (h *Handler) JWKS(w http.ResponseWriter, r *http.Request) {
+	response, err := h.service.GetJWKS(r)
+	if err != nil {
+		h.errorResponses.ServerErrorResponse(w, r, err)
+		return
+	}
+
+	jsonUtils.WriteJSON(w, http.StatusOK, jsonUtils.Envelope{"jwks": response}, nil)
+	if err != nil {
+		h.errorResponses.ServerErrorResponse(w, r, err)
+	}
+}

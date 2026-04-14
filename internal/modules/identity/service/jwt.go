@@ -11,11 +11,6 @@ import (
 	"github.com/oscargsdev/undr/internal/modules/identity/domain"
 )
 
-// TODO:  Get the signing key from env, CONFIG struct
-var mySigningKey = []byte("AllYourBase")
-
-// var issuer = "undr-auth"
-
 var ErrUnknownClaims = errors.New("unknown claims")
 
 type claims struct {
@@ -38,9 +33,8 @@ func newAccessToken(userID int64, roles domain.Roles, expiration time.Duration, 
 		},
 	}
 
-	// TODO: Check algo to sign with asymetric keys
-	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
-	tokenString, err := token.SignedString(mySigningKey)
+	token := jwt.NewWithClaims(jwt.SigningMethodRS256, claims)
+	tokenString, err := token.SignedString(privateKey)
 
 	if err != nil {
 		return "", err
@@ -51,10 +45,11 @@ func newAccessToken(userID int64, roles domain.Roles, expiration time.Duration, 
 
 func ValidateJWTToken(tokenString string, issuer string) (*jwt.Token, error) {
 	fn := func(token *jwt.Token) (any, error) {
-		return []byte("AllYourBase"), nil
+		return privateKey.Public(), nil
 	}
 
-	token, err := jwt.ParseWithClaims(tokenString, &claims{}, fn, jwt.WithIssuer(issuer), jwt.WithValidMethods([]string{jwt.SigningMethodHS256.Name}))
+	token, err := jwt.ParseWithClaims(tokenString, &claims{}, fn, jwt.WithIssuer(issuer),
+		jwt.WithValidMethods([]string{jwt.SigningMethodRS256.Name}))
 
 	if !token.Valid {
 		return nil, err
