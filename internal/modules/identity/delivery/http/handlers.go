@@ -279,7 +279,7 @@ func (h *Handler) JWKS(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	jsonUtils.WriteJSON(w, http.StatusOK, jsonUtils.Envelope{"jwks": response}, nil)
+	err = jsonUtils.WriteJSON(w, http.StatusOK, jsonUtils.Envelope{"jwks": response}, nil)
 	if err != nil {
 		h.errorResponses.ServerErrorResponse(w, r, err)
 	}
