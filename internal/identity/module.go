@@ -58,7 +58,10 @@ func New(cfg Config) *Module {
 		RefreshExpiration:    cfg.RefreshExpiration,
 		ActivationExpiration: cfg.ActivationExpiration,
 	}
-	svc := service.New(svcConfig)
+	svc, err := service.New(svcConfig)
+	if err != nil {
+		panic("could not initialize the identity service")
+	}
 
 	handler := api.NewHandler(svc, cfg.Logger)
 	router := api.NewRouter(*handler)

@@ -26,7 +26,7 @@ func (h *Handler) AuthorizationMiddleware(next http.Handler) http.Handler {
 
 		tokenString := headerParts[1]
 
-		token, err := service.ValidateJWTToken(tokenString, h.service.GetIssuer())
+		token, err := h.service.ValidateJWTToken(tokenString, h.service.GetIssuer())
 
 		if err != nil {
 			switch {

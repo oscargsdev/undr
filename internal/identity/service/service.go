@@ -1,12 +1,15 @@
 package service
 
 import (
+	"crypto/rsa"
 	"encoding/json"
 	"errors"
 	"log/slog"
 	"net/http"
 	"time"
 
+	"github.com/MicahParks/jwkset"
+	"github.com/golang-jwt/jwt/v5"
 	"github.com/oscargsdev/undr/internal/identity/domain"
 	"github.com/oscargsdev/undr/internal/identity/repository"
 )
@@ -20,6 +23,7 @@ type IdentityService interface {
 	Logout(userId int64) error
 	GetIssuer() string
 	GetJWKS(r *http.Request) (json.RawMessage, error)
+	ValidateJWTToken(tokenString string, issuer string) (*jwt.Token, error)
 }
 
 var (
@@ -38,20 +42,25 @@ type Config struct {
 }
 
 type identityService struct {
-	cfg Config
+	cfg        Config
+	jwkStore   jwkset.Storage
+	privateKey *rsa.PrivateKey
 }
 
-func New(cfg Config) *identityService {
+func New(cfg Config) (*identityService, error) {
 	identityService := &identityService{
 		cfg: cfg,
 	}
 
-	err := identityService.initJWKS()
+	privateKey, jwkStore, err := identityService.initJWKS()
 	if err != nil {
-		panic("failed to init JWKS")
+		return nil, err
 	}
 
-	return identityService
+	identityService.privateKey = privateKey
+	identityService.jwkStore = jwkStore
+
+	return identityService, nil
 }
 
 func (s *identityService) RegisterUser(user *domain.User) (*domain.OpaqueToken, error) {
@@ -103,7 +112,7 @@ func (s *identityService) ActivateUser(tokenPlainText string) (refreshTokenStrin
 	}
 	refreshTokenString = refreshToken.Plaintext
 
-	accessTokenString, err = newAccessToken(user.ID, roles, s.cfg.JWTExpiration, s.cfg.Issuer)
+	accessTokenString, err = s.newAccessToken(user.ID, roles, s.cfg.JWTExpiration, s.cfg.Issuer)
 	if err != nil {
 		return "", "", err
 	}
@@ -147,7 +156,7 @@ func (s *identityService) AuthenticateUser(email, password string) (refreshToken
 	}
 	refreshTokenString = refreshToken.Plaintext
 
-	accessTokenString, err = newAccessToken(user.ID, roles, s.cfg.JWTExpiration, s.cfg.Issuer)
+	accessTokenString, err = s.newAccessToken(user.ID, roles, s.cfg.JWTExpiration, s.cfg.Issuer)
 	if err != nil {
 		return "", "", err
 	}
@@ -178,7 +187,7 @@ func (s *identityService) RefreshToken(oldRefreshToken string) (refreshTokenStri
 	}
 	refreshTokenString = refreshToken.Plaintext
 
-	accessTokenString, err = newAccessToken(user.ID, roles, s.cfg.JWTExpiration, s.cfg.Issuer)
+	accessTokenString, err = s.newAccessToken(user.ID, roles, s.cfg.JWTExpiration, s.cfg.Issuer)
 	if err != nil {
 		return "", "", err
 	}
@@ -222,7 +231,7 @@ func (s *identityService) GetIssuer() string {
 var ErrJWKJSON = errors.New("failed to get JWK Set JSON")
 
 func (s *identityService) GetJWKS(r *http.Request) (json.RawMessage, error) {
-	response, err := jwkStore.JSONPublic(r.Context())
+	response, err := s.jwkStore.JSONPublic(r.Context())
 	if err != nil {
 		return nil, ErrJWKJSON
 	}

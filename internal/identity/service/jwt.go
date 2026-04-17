@@ -27,7 +27,7 @@ type contextKey string
 const userIdContextKey = contextKey("userId")
 const rolesContextKey = contextKey("roles")
 
-func newAccessToken(userID int64, roles domain.Roles, expiration time.Duration, issuer string) (string, error) {
+func (s *identityService) newAccessToken(userID int64, roles domain.Roles, expiration time.Duration, issuer string) (string, error) {
 	claims := claims{
 		Roles: roles,
 		RegisteredClaims: jwt.RegisteredClaims{
@@ -38,7 +38,7 @@ func newAccessToken(userID int64, roles domain.Roles, expiration time.Duration, 
 	}
 
 	token := jwt.NewWithClaims(jwt.SigningMethodRS256, claims)
-	tokenString, err := token.SignedString(privateKey)
+	tokenString, err := token.SignedString(s.privateKey)
 
 	if err != nil {
 		return "", err
@@ -47,13 +47,17 @@ func newAccessToken(userID int64, roles domain.Roles, expiration time.Duration, 
 	return tokenString, nil
 }
 
-func ValidateJWTToken(tokenString string, issuer string) (*jwt.Token, error) {
+func (s *identityService) ValidateJWTToken(tokenString string, issuer string) (*jwt.Token, error) {
 	fn := func(token *jwt.Token) (any, error) {
-		return privateKey.Public(), nil
+		return s.privateKey.Public(), nil
 	}
 
 	token, err := jwt.ParseWithClaims(tokenString, &claims{}, fn, jwt.WithIssuer(issuer),
 		jwt.WithValidMethods([]string{jwt.SigningMethodRS256.Name}))
+
+	if token == nil {
+		return nil, jwt.ErrTokenMalformed
+	}
 
 	if !token.Valid {
 		return nil, err

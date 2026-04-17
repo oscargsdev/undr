@@ -8,20 +8,15 @@ import (
 	"github.com/MicahParks/jwkset"
 )
 
-var jwkStore jwkset.Storage
-var privateKey *rsa.PrivateKey
-
-func (s *identityService) initJWKS() error {
+func (s *identityService) initJWKS() (*rsa.PrivateKey, jwkset.Storage, error) {
 	ctx := context.Background()
-	jwkStore = jwkset.NewMemoryStorage()
+	jwkStore := jwkset.NewMemoryStorage()
 
-	key, err := rsa.GenerateKey(rand.Reader, 2048)
+	privateKey, err := rsa.GenerateKey(rand.Reader, 2048)
 	if err != nil {
 		s.cfg.Logger.Error("failed to generate RSA key")
-		return err
+		return nil, nil, err
 	}
-
-	privateKey = key
 
 	metadata := jwkset.JWKMetadataOptions{
 		KID: "my-key-id",
@@ -30,17 +25,17 @@ func (s *identityService) initJWKS() error {
 		Metadata: metadata,
 	}
 
-	jwk, err := jwkset.NewJWKFromKey(key, options)
+	jwk, err := jwkset.NewJWKFromKey(privateKey, options)
 	if err != nil {
 		s.cfg.Logger.Error("failed to create JWK from key")
-		return err
+		return nil, nil, err
 	}
 
 	err = jwkStore.KeyWrite(ctx, jwk)
 	if err != nil {
 		s.cfg.Logger.Error("failed to store RSA key")
-		return err
+		return nil, nil, err
 	}
 
-	return nil
+	return privateKey, jwkStore, nil
 }
