@@ -136,8 +136,18 @@ func (h *Handler) activateUserHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *Handler) testSecuredEndpoint(w http.ResponseWriter, r *http.Request) {
-	userId := service.ContextGetUserId(r)
-	roles := service.ContextGetRoles(r)
+	userId, err := service.ContextGetUserId(r)
+	if err != nil {
+		h.errorResponses.AuthenticationRequiredResponse(w, r)
+		return
+	}
+
+	roles, err := service.ContextGetRoles(r)
+	if err != nil {
+		h.errorResponses.AuthenticationRequiredResponse(w, r)
+		return
+	}
+
 	jsonx.WriteJSON(w, http.StatusOK, jsonx.Envelope{"userId": userId, "roles": roles}, nil)
 }
 
@@ -222,9 +232,13 @@ func (h *Handler) refreshTokenHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *Handler) logoutHandler(w http.ResponseWriter, r *http.Request) {
-	userId := service.ContextGetUserId(r)
+	userId, err := service.ContextGetUserId(r)
+	if err != nil {
+		h.errorResponses.AuthenticationRequiredResponse(w, r)
+		return
+	}
 
-	err := h.service.Logout(userId)
+	err = h.service.Logout(userId)
 	if err != nil {
 		h.errorResponses.ServerErrorResponse(w, r, err)
 		return
@@ -246,7 +260,11 @@ func (h *Handler) MyInfoHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	contextUserId := service.ContextGetUserId(r)
+	contextUserId, err := service.ContextGetUserId(r)
+	if err != nil {
+		h.errorResponses.AuthenticationRequiredResponse(w, r)
+		return
+	}
 
 	if pathUserId != contextUserId {
 		h.errorResponses.InvalidCredentialsResponse(w, r)

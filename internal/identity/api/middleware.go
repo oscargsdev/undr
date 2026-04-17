@@ -53,10 +53,14 @@ func (h *Handler) AuthorizationMiddleware(next http.Handler) http.Handler {
 
 func (h *Handler) RequireRoleMiddleware(code string, next http.Handler) http.Handler {
 	fn := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		roles := service.ContextGetRoles(r)
+		roles, err := service.ContextGetRoles(r)
+		if err != nil {
+			h.errorResponses.AuthenticationRequiredResponse(w, r)
+			return
+		}
 
 		if !slices.Contains(roles, code) {
-			h.errorResponses.NotPermittedResponse(w, r)
+			h.errorResponses.AuthenticationRequiredResponse(w, r)
 			return
 		}
 

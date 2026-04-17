@@ -11,7 +11,11 @@ import (
 	"github.com/oscargsdev/undr/internal/identity/domain"
 )
 
-var ErrUnknownClaims = errors.New("unknown claims")
+var (
+	ErrUnknownClaims             = errors.New("unknown claims")
+	ErrMissingUserIDInContext    = errors.New("missing user id in context")
+	ErrMissingUserRolesInContext = errors.New("missing user roles in context")
+)
 
 type claims struct {
 	Roles []string `json:"roles"`
@@ -72,21 +76,24 @@ func ContextSetClaims(r *http.Request, token *jwt.Token) *http.Request {
 	return r.WithContext(ctx)
 }
 
-func ContextGetUserId(r *http.Request) int64 {
+func ContextGetUserId(r *http.Request) (int64, error) {
 	userId, ok := r.Context().Value(userIdContextKey).(string)
 	if !ok {
-		panic("missing user id value in request")
+		return -1, ErrMissingUserIDInContext
 	}
 
-	id, _ := strconv.ParseInt(userId, 10, 64)
-	return id
+	id, err := strconv.ParseInt(userId, 10, 64)
+	if err != nil {
+		return -1, err
+	}
+	return id, nil
 }
 
-func ContextGetRoles(r *http.Request) []string {
+func ContextGetRoles(r *http.Request) ([]string, error) {
 	roles, ok := r.Context().Value(rolesContextKey).([]string)
 	if !ok {
-		panic("missing roles value in request")
+		return nil, ErrMissingUserRolesInContext
 	}
 
-	return roles
+	return roles, nil
 }
