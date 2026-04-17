@@ -6,7 +6,7 @@ import (
 	"net/http"
 	"time"
 
-	delivery "github.com/oscargsdev/undr/internal/identity/delivery/http"
+	"github.com/oscargsdev/undr/internal/identity/api"
 	"github.com/oscargsdev/undr/internal/identity/repository"
 	"github.com/oscargsdev/undr/internal/identity/service"
 )
@@ -60,8 +60,8 @@ func New(cfg Config) *Module {
 	}
 	svc := service.New(svcConfig)
 
-	handler := delivery.NewHandler(svc, cfg.Logger)
-	router := delivery.NewRouter(*handler)
+	handler := api.NewHandler(svc, cfg.Logger)
+	router := api.NewRouter(*handler)
 
 	module.Router = router
 	return module
