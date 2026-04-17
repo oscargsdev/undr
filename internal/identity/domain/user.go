@@ -80,6 +80,6 @@ func ValidateUser(v *validator.Validator, user *User) {
 	}
 
 	if user.Password.Hash == nil {
-		panic("missing password hash for user")
+		v.AddError("password", "missing password hash for user")
 	}
 }
