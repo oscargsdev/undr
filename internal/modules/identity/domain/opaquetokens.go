@@ -6,7 +6,7 @@ import (
 	"errors"
 	"time"
 
-	"github.com/oscargsdev/undr/internal/common/validator"
+	"github.com/oscargsdev/undr/internal/validator"
 )
 
 const (

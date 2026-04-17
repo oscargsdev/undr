@@ -7,19 +7,19 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/oscargsdev/undr/internal/common/validator"
 	"github.com/oscargsdev/undr/internal/modules/identity/domain"
 	"github.com/oscargsdev/undr/internal/modules/identity/repository"
 	"github.com/oscargsdev/undr/internal/modules/identity/service"
+	"github.com/oscargsdev/undr/internal/validator"
 
-	errorResponses "github.com/oscargsdev/undr/internal/common/errors"
-	jsonUtils "github.com/oscargsdev/undr/internal/common/json"
+	"github.com/oscargsdev/undr/internal/jsonx"
+	"github.com/oscargsdev/undr/internal/responses"
 )
 
 type Handler struct {
 	service        service.IdentityService
 	logger         *slog.Logger
-	errorResponses *errorResponses.ErrorResponseHelper
+	errorResponses *responses.ErrorResponseHelper
 }
 
 func newRefreshTokenCookie(refreshToken string, expires time.Time) *http.Cookie {
@@ -38,7 +38,7 @@ func NewHandler(svc service.IdentityService, logger *slog.Logger) *Handler {
 	return &Handler{
 		service:        svc,
 		logger:         logger,
-		errorResponses: errorResponses.New(logger),
+		errorResponses: responses.New(logger),
 	}
 }
 
@@ -49,7 +49,7 @@ func (h *Handler) registerUserHandler(w http.ResponseWriter, r *http.Request) {
 		Password string `json:"password"`
 	}
 
-	err := jsonUtils.ReadJSON(w, r, &input)
+	err := jsonx.ReadJSON(w, r, &input)
 	if err != nil {
 		h.errorResponses.BadRequestResponse(w, r, err)
 		return
@@ -89,7 +89,7 @@ func (h *Handler) registerUserHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	err = jsonUtils.WriteJSON(w, http.StatusAccepted, jsonUtils.Envelope{"user": user, "activation_token": activationToken.Plaintext}, nil)
+	err = jsonx.WriteJSON(w, http.StatusAccepted, jsonx.Envelope{"user": user, "activation_token": activationToken.Plaintext}, nil)
 	if err != nil {
 		h.errorResponses.ServerErrorResponse(w, r, err)
 	}
@@ -100,7 +100,7 @@ func (h *Handler) activateUserHandler(w http.ResponseWriter, r *http.Request) {
 		TokenPlainText string `json:"activationToken"`
 	}
 
-	err := jsonUtils.ReadJSON(w, r, &input)
+	err := jsonx.ReadJSON(w, r, &input)
 	if err != nil {
 		h.errorResponses.BadRequestResponse(w, r, err)
 		return
@@ -129,7 +129,7 @@ func (h *Handler) activateUserHandler(w http.ResponseWriter, r *http.Request) {
 
 	http.SetCookie(w, newRefreshTokenCookie(refreshToken, time.Now().Add(24*time.Hour)))
 
-	err = jsonUtils.WriteJSON(w, http.StatusOK, jsonUtils.Envelope{"access_token": accessToken}, nil)
+	err = jsonx.WriteJSON(w, http.StatusOK, jsonx.Envelope{"access_token": accessToken}, nil)
 	if err != nil {
 		h.errorResponses.ServerErrorResponse(w, r, err)
 	}
@@ -138,7 +138,7 @@ func (h *Handler) activateUserHandler(w http.ResponseWriter, r *http.Request) {
 func (h *Handler) testSecuredEndpoint(w http.ResponseWriter, r *http.Request) {
 	userId := service.ContextGetUserId(r)
 	roles := service.ContextGetRoles(r)
-	jsonUtils.WriteJSON(w, http.StatusOK, jsonUtils.Envelope{"userId": userId, "roles": roles}, nil)
+	jsonx.WriteJSON(w, http.StatusOK, jsonx.Envelope{"userId": userId, "roles": roles}, nil)
 }
 
 func (h *Handler) authenticateUserHandler(w http.ResponseWriter, r *http.Request) {
@@ -147,7 +147,7 @@ func (h *Handler) authenticateUserHandler(w http.ResponseWriter, r *http.Request
 		Password string `json:"password"`
 	}
 
-	err := jsonUtils.ReadJSON(w, r, &input)
+	err := jsonx.ReadJSON(w, r, &input)
 	if err != nil {
 		h.errorResponses.BadRequestResponse(w, r, err)
 		return
@@ -180,7 +180,7 @@ func (h *Handler) authenticateUserHandler(w http.ResponseWriter, r *http.Request
 
 	http.SetCookie(w, newRefreshTokenCookie(refreshToken, time.Now().Add(24*time.Hour)))
 
-	err = jsonUtils.WriteJSON(w, http.StatusOK, jsonUtils.Envelope{"access_token": accessToken}, nil)
+	err = jsonx.WriteJSON(w, http.StatusOK, jsonx.Envelope{"access_token": accessToken}, nil)
 	if err != nil {
 		h.errorResponses.ServerErrorResponse(w, r, err)
 	}
@@ -215,7 +215,7 @@ func (h *Handler) refreshTokenHandler(w http.ResponseWriter, r *http.Request) {
 
 	http.SetCookie(w, newRefreshTokenCookie(refreshToken, time.Now().Add(24*time.Hour)))
 
-	err = jsonUtils.WriteJSON(w, http.StatusOK, jsonUtils.Envelope{"access_token": accessToken}, nil)
+	err = jsonx.WriteJSON(w, http.StatusOK, jsonx.Envelope{"access_token": accessToken}, nil)
 	if err != nil {
 		h.errorResponses.ServerErrorResponse(w, r, err)
 	}
@@ -236,7 +236,7 @@ func (h *Handler) logoutHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *Handler) OnlyAdminsHandler(w http.ResponseWriter, r *http.Request) {
-	jsonUtils.WriteJSON(w, http.StatusOK, jsonUtils.Envelope{"howdy": "you are an admin!"}, nil)
+	jsonx.WriteJSON(w, http.StatusOK, jsonx.Envelope{"howdy": "you are an admin!"}, nil)
 }
 
 func (h *Handler) MyInfoHandler(w http.ResponseWriter, r *http.Request) {
@@ -266,7 +266,7 @@ func (h *Handler) MyInfoHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	err = jsonUtils.WriteJSON(w, http.StatusOK, jsonUtils.Envelope{"user_details": user}, nil)
+	err = jsonx.WriteJSON(w, http.StatusOK, jsonx.Envelope{"user_details": user}, nil)
 	if err != nil {
 		h.errorResponses.ServerErrorResponse(w, r, err)
 	}
@@ -279,7 +279,7 @@ func (h *Handler) JWKS(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	err = jsonUtils.WriteJSON(w, http.StatusOK, jsonUtils.Envelope{"jwks": response}, nil)
+	err = jsonx.WriteJSON(w, http.StatusOK, jsonx.Envelope{"jwks": response}, nil)
 	if err != nil {
 		h.errorResponses.ServerErrorResponse(w, r, err)
 	}

@@ -1,11 +1,11 @@
-package errors
+package responses
 
 import (
 	"fmt"
 	"log/slog"
 	"net/http"
 
-	jsonUtils "github.com/oscargsdev/undr/internal/common/json"
+	jsonUtils "github.com/oscargsdev/undr/internal/jsonx"
 )
 
 type ErrorResponseHelper struct {
