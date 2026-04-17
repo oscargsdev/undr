@@ -277,7 +277,7 @@ func (h *Handler) MyInfoHandler(w http.ResponseWriter, r *http.Request) {
 		case errors.Is(err, repository.ErrRecordNotFound):
 			h.errorResponses.NotFoundResponse(w, r)
 		case errors.Is(err, service.ErrUserWithoutRoles):
-			panic("user has no roles, should have at least 1")
+			h.errorResponses.ServerErrorResponse(w, r, err)
 		default:
 			h.errorResponses.ServerErrorResponse(w, r, err)
 		}
