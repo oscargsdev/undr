@@ -8,7 +8,7 @@ import (
 	"time"
 
 	"github.com/oscargsdev/undr/internal/identity/domain"
-	"github.com/oscargsdev/undr/internal/identity/repository"
+	"github.com/oscargsdev/undr/internal/identity/postgres"
 	"github.com/oscargsdev/undr/internal/identity/service"
 	"github.com/oscargsdev/undr/internal/validator"
 
@@ -77,10 +77,10 @@ func (h *Handler) registerUserHandler(w http.ResponseWriter, r *http.Request) {
 	activationToken, err := h.service.RegisterUser(user)
 	if err != nil {
 		switch {
-		case errors.Is(err, repository.ErrDuplicateEmail):
+		case errors.Is(err, postgres.ErrDuplicateEmail):
 			v.AddError("email", "a user with this email address already exists")
 			h.errorResponses.FailedValidationResponse(w, r, v.Errors)
-		case errors.Is(err, repository.ErrDuplicateUsername):
+		case errors.Is(err, postgres.ErrDuplicateUsername):
 			v.AddError("username", "a user with this username already exists")
 			h.errorResponses.FailedValidationResponse(w, r, v.Errors)
 		default:
@@ -116,10 +116,10 @@ func (h *Handler) activateUserHandler(w http.ResponseWriter, r *http.Request) {
 	refreshToken, accessToken, err := h.service.ActivateUser(input.TokenPlainText)
 	if err != nil {
 		switch {
-		case errors.Is(err, repository.ErrRecordNotFound):
+		case errors.Is(err, postgres.ErrRecordNotFound):
 			v.AddError("token", "invalid or expired activation token")
 			h.errorResponses.FailedValidationResponse(w, r, v.Errors)
-		case errors.Is(err, repository.ErrEditConflict):
+		case errors.Is(err, postgres.ErrEditConflict):
 			h.errorResponses.EditConflictResponse(w, r)
 		default:
 			h.errorResponses.ServerErrorResponse(w, r, err)
@@ -176,7 +176,7 @@ func (h *Handler) authenticateUserHandler(w http.ResponseWriter, r *http.Request
 	refreshToken, accessToken, err := h.service.AuthenticateUser(input.Email, input.Password)
 	if err != nil {
 		switch {
-		case errors.Is(err, repository.ErrRecordNotFound):
+		case errors.Is(err, postgres.ErrRecordNotFound):
 			h.errorResponses.InvalidCredentialsResponse(w, r)
 		case errors.Is(err, service.ErrInvalidCredentials):
 			h.errorResponses.InvalidCredentialsResponse(w, r)
@@ -215,7 +215,7 @@ func (h *Handler) refreshTokenHandler(w http.ResponseWriter, r *http.Request) {
 	refreshToken, accessToken, err := h.service.RefreshToken(oldToken)
 	if err != nil {
 		switch {
-		case errors.Is(err, repository.ErrRecordNotFound):
+		case errors.Is(err, postgres.ErrRecordNotFound):
 			h.errorResponses.BadRequestResponse(w, r, domain.ErrInvalidRefreshToken)
 		default:
 			h.errorResponses.ServerErrorResponse(w, r, err)
@@ -274,7 +274,7 @@ func (h *Handler) MyInfoHandler(w http.ResponseWriter, r *http.Request) {
 	user, err := h.service.GetUserById(contextUserId)
 	if err != nil {
 		switch {
-		case errors.Is(err, repository.ErrRecordNotFound):
+		case errors.Is(err, postgres.ErrRecordNotFound):
 			h.errorResponses.NotFoundResponse(w, r)
 		case errors.Is(err, service.ErrUserWithoutRoles):
 			h.errorResponses.ServerErrorResponse(w, r, err)

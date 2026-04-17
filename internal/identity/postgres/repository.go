@@ -1,4 +1,4 @@
-package repository
+package postgres
 
 import (
 	"context"
@@ -12,18 +12,6 @@ import (
 	"github.com/lib/pq"
 	"github.com/oscargsdev/undr/internal/identity/domain"
 )
-
-type IdentityRepository interface {
-	InsertUser(*domain.User) error
-	UpdateUser(*domain.User) error
-	NewOpaqueToken(userID int64, ttl time.Duration, scope string) (*domain.OpaqueToken, error)
-	GetForOpaqueToken(tokenScope, tokenPlaintext string) (*domain.User, error)
-	DeleteAllFromUser(scope string, userID int64) error
-	GetUserByEmail(email string) (*domain.User, error)
-	GetUserById(userId int64) (*domain.User, error)
-	GetAllRolesForUser(userID int64) (domain.Roles, error)
-	AddRoleForUser(userID int64, codes ...string) error
-}
 
 type repository struct {
 	db        *sql.DB

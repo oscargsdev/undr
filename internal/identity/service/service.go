@@ -11,7 +11,6 @@ import (
 	"github.com/MicahParks/jwkset"
 	"github.com/golang-jwt/jwt/v5"
 	"github.com/oscargsdev/undr/internal/identity/domain"
-	"github.com/oscargsdev/undr/internal/identity/repository"
 )
 
 type IdentityService interface {
@@ -26,6 +25,18 @@ type IdentityService interface {
 	ValidateJWTToken(tokenString string, issuer string) (*jwt.Token, error)
 }
 
+type identityRepository interface {
+	InsertUser(*domain.User) error
+	UpdateUser(*domain.User) error
+	NewOpaqueToken(userID int64, ttl time.Duration, scope string) (*domain.OpaqueToken, error)
+	GetForOpaqueToken(tokenScope, tokenPlaintext string) (*domain.User, error)
+	DeleteAllFromUser(scope string, userID int64) error
+	GetUserByEmail(email string) (*domain.User, error)
+	GetUserById(userId int64) (*domain.User, error)
+	GetAllRolesForUser(userID int64) (domain.Roles, error)
+	AddRoleForUser(userID int64, codes ...string) error
+}
+
 var (
 	ErrInvalidCredentials = errors.New("invalid credentials")
 	ErrUserNotActivated   = errors.New("user not activated")
@@ -33,7 +44,7 @@ var (
 )
 
 type Config struct {
-	Repository           repository.IdentityRepository
+	Repository           identityRepository
 	Logger               *slog.Logger
 	Issuer               string
 	JWTExpiration        time.Duration

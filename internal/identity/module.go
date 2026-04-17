@@ -7,7 +7,7 @@ import (
 	"time"
 
 	"github.com/oscargsdev/undr/internal/identity/api"
-	"github.com/oscargsdev/undr/internal/identity/repository"
+	"github.com/oscargsdev/undr/internal/identity/postgres"
 	"github.com/oscargsdev/undr/internal/identity/service"
 )
 
@@ -48,7 +48,7 @@ type FlagConfig struct {
 func New(cfg Config) *Module {
 	module := &Module{}
 
-	repo := repository.NewRepository(cfg.DB, cfg.DBTimeout, cfg.Logger)
+	repo := postgres.NewRepository(cfg.DB, cfg.DBTimeout, cfg.Logger)
 
 	svcConfig := service.Config{
 		Repository:           repo,
