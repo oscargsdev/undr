@@ -10,7 +10,7 @@ import (
 	"time"
 
 	"github.com/lib/pq"
-	"github.com/oscargsdev/undr/internal/modules/identity/domain"
+	"github.com/oscargsdev/undr/internal/identity/domain"
 )
 
 type IdentityRepository interface {

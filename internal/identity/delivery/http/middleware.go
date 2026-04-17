@@ -7,7 +7,7 @@ import (
 	"strings"
 
 	"github.com/golang-jwt/jwt/v5"
-	"github.com/oscargsdev/undr/internal/modules/identity/service"
+	"github.com/oscargsdev/undr/internal/identity/service"
 )
 
 func (h *Handler) AuthorizationMiddleware(next http.Handler) http.Handler {

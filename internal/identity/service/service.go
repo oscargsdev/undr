@@ -7,8 +7,8 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/oscargsdev/undr/internal/modules/identity/domain"
-	"github.com/oscargsdev/undr/internal/modules/identity/repository"
+	"github.com/oscargsdev/undr/internal/identity/domain"
+	"github.com/oscargsdev/undr/internal/identity/repository"
 )
 
 type IdentityService interface {

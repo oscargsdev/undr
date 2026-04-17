@@ -7,9 +7,9 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/oscargsdev/undr/internal/modules/identity/domain"
-	"github.com/oscargsdev/undr/internal/modules/identity/repository"
-	"github.com/oscargsdev/undr/internal/modules/identity/service"
+	"github.com/oscargsdev/undr/internal/identity/domain"
+	"github.com/oscargsdev/undr/internal/identity/repository"
+	"github.com/oscargsdev/undr/internal/identity/service"
 	"github.com/oscargsdev/undr/internal/validator"
 
 	"github.com/oscargsdev/undr/internal/jsonx"

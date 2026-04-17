@@ -11,7 +11,7 @@ import (
 
 	_ "github.com/lib/pq"
 
-	"github.com/oscargsdev/undr/internal/modules/identity"
+	"github.com/oscargsdev/undr/internal/identity"
 )
 
 type config struct {

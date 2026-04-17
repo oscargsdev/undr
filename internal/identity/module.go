@@ -6,9 +6,9 @@ import (
 	"net/http"
 	"time"
 
-	delivery "github.com/oscargsdev/undr/internal/modules/identity/delivery/http"
-	"github.com/oscargsdev/undr/internal/modules/identity/repository"
-	"github.com/oscargsdev/undr/internal/modules/identity/service"
+	delivery "github.com/oscargsdev/undr/internal/identity/delivery/http"
+	"github.com/oscargsdev/undr/internal/identity/repository"
+	"github.com/oscargsdev/undr/internal/identity/service"
 )
 
 type Module struct {

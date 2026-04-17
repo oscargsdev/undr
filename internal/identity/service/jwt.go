@@ -8,7 +8,7 @@ import (
 	"time"
 
 	"github.com/golang-jwt/jwt/v5"
-	"github.com/oscargsdev/undr/internal/modules/identity/domain"
+	"github.com/oscargsdev/undr/internal/identity/domain"
 )
 
 var ErrUnknownClaims = errors.New("unknown claims")
