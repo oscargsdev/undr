@@ -45,7 +45,7 @@ type FlagConfig struct {
 	DBTimeout            int // in seconds
 }
 
-func New(cfg Config) *Module {
+func New(cfg Config) (*Module, error) {
 	module := &Module{}
 
 	repo := postgres.NewRepository(cfg.DB, cfg.DBTimeout, cfg.Logger)
@@ -60,12 +60,12 @@ func New(cfg Config) *Module {
 	}
 	svc, err := service.New(svcConfig)
 	if err != nil {
-		panic("could not initialize the identity service")
+		return nil, err
 	}
 
 	handler := api.NewHandler(svc, cfg.Logger)
 	router := api.NewRouter(*handler)
 
 	module.Router = router
-	return module
+	return module, nil
 }

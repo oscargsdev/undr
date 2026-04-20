@@ -64,7 +64,11 @@ func main() {
 	logger.Info("database connection pool established")
 
 	identityCfg := identity.NewConfig(db, logger, identityFlags)
-	identityModule := identity.New(identityCfg)
+	identityModule, err := identity.New(identityCfg)
+	if err != nil {
+		logger.Error(err.Error())
+		os.Exit(1)
+	}
 
 	app := &application{
 		config:         cfg,

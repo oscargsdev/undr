@@ -60,7 +60,7 @@ func (h *Handler) RequireRoleMiddleware(code string, next http.Handler) http.Han
 		}
 
 		if !slices.Contains(roles, code) {
-			h.errorResponses.AuthenticationRequiredResponse(w, r)
+			h.errorResponses.NotPermittedResponse(w, r)
 			return
 		}
 
