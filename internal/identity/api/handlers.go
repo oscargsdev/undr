@@ -1,12 +1,14 @@
 package api
 
 import (
+	"encoding/json"
 	"errors"
 	"log/slog"
 	"net/http"
 	"strconv"
 	"time"
 
+	"github.com/golang-jwt/jwt/v5"
 	"github.com/oscargsdev/undr/internal/identity/domain"
 	"github.com/oscargsdev/undr/internal/identity/postgres"
 	"github.com/oscargsdev/undr/internal/identity/service"
@@ -16,8 +18,20 @@ import (
 	"github.com/oscargsdev/undr/internal/responses"
 )
 
+type IdentityService interface {
+	RegisterUser(user *domain.User) (*domain.OpaqueToken, error)
+	ActivateUser(tokenPlainText string) (refreshTokenString string, accessTokenString string, err error)
+	AuthenticateUser(email, password string) (refreshTokenString string, accessTokenString string, err error)
+	GetUserById(userId int64) (*domain.UserDetails, error)
+	RefreshToken(oldRefreshToken string) (refreshTokenString string, accessTokenString string, err error)
+	Logout(userId int64) error
+	GetIssuer() string
+	GetJWKS(r *http.Request) (json.RawMessage, error)
+	ValidateJWTToken(tokenString string, issuer string) (*jwt.Token, error)
+}
+
 type Handler struct {
-	service        service.IdentityService
+	service        IdentityService
 	logger         *slog.Logger
 	errorResponses *responses.ErrorResponseHelper
 }
@@ -34,7 +48,7 @@ func newRefreshTokenCookie(refreshToken string, expires time.Time) *http.Cookie 
 	}
 }
 
-func NewHandler(svc service.IdentityService, logger *slog.Logger) *Handler {
+func NewHandler(svc IdentityService, logger *slog.Logger) *Handler {
 	return &Handler{
 		service:        svc,
 		logger:         logger,

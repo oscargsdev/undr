@@ -20,6 +20,11 @@ type User struct {
 	Version   int       `json:"-"`
 }
 
+type UserDetails struct {
+	User
+	Roles `json:"roles"`
+}
+
 func (u *User) IsAnonymous() bool {
 	return u == AnonymousUser
 }

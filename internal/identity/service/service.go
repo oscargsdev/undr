@@ -9,21 +9,8 @@ import (
 	"time"
 
 	"github.com/MicahParks/jwkset"
-	"github.com/golang-jwt/jwt/v5"
 	"github.com/oscargsdev/undr/internal/identity/domain"
 )
-
-type IdentityService interface {
-	RegisterUser(user *domain.User) (*domain.OpaqueToken, error)
-	ActivateUser(tokenPlainText string) (refreshTokenString string, accessTokenString string, err error)
-	AuthenticateUser(email, password string) (refreshTokenString string, accessTokenString string, err error)
-	GetUserById(userId int64) (*UserDetails, error)
-	RefreshToken(oldRefreshToken string) (refreshTokenString string, accessTokenString string, err error)
-	Logout(userId int64) error
-	GetIssuer() string
-	GetJWKS(r *http.Request) (json.RawMessage, error)
-	ValidateJWTToken(tokenString string, issuer string) (*jwt.Token, error)
-}
 
 type identityRepository interface {
 	InsertUser(*domain.User) error
@@ -211,12 +198,7 @@ func (s *identityService) Logout(userId int64) error {
 	return err
 }
 
-type UserDetails struct {
-	domain.User
-	domain.Roles `json:"roles"`
-}
-
-func (s *identityService) GetUserById(userId int64) (*UserDetails, error) {
+func (s *identityService) GetUserById(userId int64) (*domain.UserDetails, error) {
 	user, err := s.cfg.Repository.GetUserById(userId)
 	if err != nil {
 		return nil, err
@@ -227,9 +209,9 @@ func (s *identityService) GetUserById(userId int64) (*UserDetails, error) {
 		return nil, ErrUserWithoutRoles
 	}
 
-	userDetails := UserDetails{
-		*user,
-		roles,
+	userDetails := domain.UserDetails{
+		User:  *user,
+		Roles: roles,
 	}
 
 	return &userDetails, nil
