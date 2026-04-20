@@ -13,20 +13,22 @@ import (
 	"github.com/oscargsdev/undr/internal/identity/postgres"
 )
 
-type userRepository interface {
+type usersRepository interface {
 	InsertUser(*domain.User) error
 	UpdateUser(*domain.User) error
 	GetForOpaqueToken(tokenScope, tokenPlaintext string) (*domain.User, error)
 	GetUserByEmail(email string) (*domain.User, error)
 	GetUserById(userId int64) (*domain.User, error)
-
-	GetAllRolesForUser(userID int64) (domain.Roles, error)
-	AddRoleForUser(userID int64, codes ...string) error
 }
 
-type opaqueTokenRepository interface {
+type opaqueTokensRepository interface {
 	NewOpaqueToken(userID int64, ttl time.Duration, scope string) (*domain.OpaqueToken, error)
 	DeleteAllFromUser(scope string, userID int64) error
+}
+
+type rolesRepository interface {
+	GetAllRolesForUser(userID int64) (domain.Roles, error)
+	AddRoleForUser(userID int64, codes ...string) error
 }
 
 var (
@@ -55,13 +57,14 @@ func mapRepositoryError(err error) error {
 }
 
 type Config struct {
-	UserRepository        userRepository
-	OpaqueTokenRepository opaqueTokenRepository
-	Logger                *slog.Logger
-	Issuer                string
-	JWTExpiration         time.Duration
-	RefreshExpiration     time.Duration
-	ActivationExpiration  time.Duration
+	UsersRepository        usersRepository
+	OpaqueTokensRepository opaqueTokensRepository
+	RolesRepository        rolesRepository
+	Logger                 *slog.Logger
+	Issuer                 string
+	JWTExpiration          time.Duration
+	RefreshExpiration      time.Duration
+	ActivationExpiration   time.Duration
 }
 
 type identityService struct {
@@ -87,17 +90,17 @@ func New(cfg Config) (*identityService, error) {
 }
 
 func (s *identityService) RegisterUser(user *domain.User) (*domain.OpaqueToken, error) {
-	err := s.cfg.UserRepository.InsertUser(user)
+	err := s.cfg.UsersRepository.InsertUser(user)
 	if err != nil {
 		return nil, mapRepositoryError(err)
 	}
 
-	err = s.cfg.UserRepository.AddRoleForUser(user.ID, "user")
+	err = s.cfg.RolesRepository.AddRoleForUser(user.ID, "user")
 	if err != nil {
 		return nil, mapRepositoryError(err)
 	}
 
-	activationToken, err := s.cfg.OpaqueTokenRepository.NewOpaqueToken(user.ID, s.cfg.ActivationExpiration, domain.ScopeActivation)
+	activationToken, err := s.cfg.OpaqueTokensRepository.NewOpaqueToken(user.ID, s.cfg.ActivationExpiration, domain.ScopeActivation)
 	if err != nil {
 		return nil, mapRepositoryError(err)
 	}
@@ -107,29 +110,29 @@ func (s *identityService) RegisterUser(user *domain.User) (*domain.OpaqueToken, 
 }
 
 func (s *identityService) ActivateUser(tokenPlainText string) (refreshTokenString string, accessTokenString string, err error) {
-	user, err := s.cfg.UserRepository.GetForOpaqueToken(domain.ScopeActivation, tokenPlainText)
+	user, err := s.cfg.UsersRepository.GetForOpaqueToken(domain.ScopeActivation, tokenPlainText)
 	if err != nil {
 		return "", "", mapRepositoryError(err)
 	}
 
-	roles, err := s.cfg.UserRepository.GetAllRolesForUser(user.ID)
+	roles, err := s.cfg.RolesRepository.GetAllRolesForUser(user.ID)
 	if err != nil {
 		return "", "", mapRepositoryError(err)
 	}
 
 	user.Activated = true
 
-	err = s.cfg.UserRepository.UpdateUser(user)
+	err = s.cfg.UsersRepository.UpdateUser(user)
 	if err != nil {
 		return "", "", mapRepositoryError(err)
 	}
 
-	err = s.cfg.OpaqueTokenRepository.DeleteAllFromUser(domain.ScopeActivation, user.ID)
+	err = s.cfg.OpaqueTokensRepository.DeleteAllFromUser(domain.ScopeActivation, user.ID)
 	if err != nil {
 		return "", "", mapRepositoryError(err)
 	}
 
-	refreshToken, err := s.cfg.OpaqueTokenRepository.NewOpaqueToken(user.ID, s.cfg.RefreshExpiration, domain.ScopeRefresh)
+	refreshToken, err := s.cfg.OpaqueTokensRepository.NewOpaqueToken(user.ID, s.cfg.RefreshExpiration, domain.ScopeRefresh)
 	if err != nil {
 		return "", "", mapRepositoryError(err)
 	}
@@ -145,12 +148,12 @@ func (s *identityService) ActivateUser(tokenPlainText string) (refreshTokenStrin
 }
 
 func (s *identityService) AuthenticateUser(email, password string) (refreshTokenString string, accessTokenString string, err error) {
-	user, err := s.cfg.UserRepository.GetUserByEmail(email)
+	user, err := s.cfg.UsersRepository.GetUserByEmail(email)
 	if err != nil {
 		return "", "", mapRepositoryError(err)
 	}
 
-	roles, err := s.cfg.UserRepository.GetAllRolesForUser(user.ID)
+	roles, err := s.cfg.RolesRepository.GetAllRolesForUser(user.ID)
 	if err != nil {
 		return "", "", mapRepositoryError(err)
 	}
@@ -168,12 +171,12 @@ func (s *identityService) AuthenticateUser(email, password string) (refreshToken
 		return "", "", ErrUserNotActivated
 	}
 
-	err = s.cfg.OpaqueTokenRepository.DeleteAllFromUser(domain.ScopeRefresh, user.ID)
+	err = s.cfg.OpaqueTokensRepository.DeleteAllFromUser(domain.ScopeRefresh, user.ID)
 	if err != nil {
 		return "", "", mapRepositoryError(err)
 	}
 
-	refreshToken, err := s.cfg.OpaqueTokenRepository.NewOpaqueToken(user.ID, s.cfg.RefreshExpiration, domain.ScopeRefresh)
+	refreshToken, err := s.cfg.OpaqueTokensRepository.NewOpaqueToken(user.ID, s.cfg.RefreshExpiration, domain.ScopeRefresh)
 	if err != nil {
 		return "", "", mapRepositoryError(err)
 	}
@@ -189,22 +192,22 @@ func (s *identityService) AuthenticateUser(email, password string) (refreshToken
 }
 
 func (s *identityService) RefreshToken(oldRefreshToken string) (refreshTokenString string, accessTokenString string, err error) {
-	user, err := s.cfg.UserRepository.GetForOpaqueToken(domain.ScopeRefresh, oldRefreshToken)
+	user, err := s.cfg.UsersRepository.GetForOpaqueToken(domain.ScopeRefresh, oldRefreshToken)
 	if err != nil {
 		return "", "", mapRepositoryError(err)
 	}
 
-	roles, err := s.cfg.UserRepository.GetAllRolesForUser(user.ID)
+	roles, err := s.cfg.RolesRepository.GetAllRolesForUser(user.ID)
 	if err != nil {
 		return "", "", mapRepositoryError(err)
 	}
 
-	err = s.cfg.OpaqueTokenRepository.DeleteAllFromUser(domain.ScopeRefresh, user.ID)
+	err = s.cfg.OpaqueTokensRepository.DeleteAllFromUser(domain.ScopeRefresh, user.ID)
 	if err != nil {
 		return "", "", mapRepositoryError(err)
 	}
 
-	refreshToken, err := s.cfg.OpaqueTokenRepository.NewOpaqueToken(user.ID, s.cfg.RefreshExpiration, domain.ScopeRefresh)
+	refreshToken, err := s.cfg.OpaqueTokensRepository.NewOpaqueToken(user.ID, s.cfg.RefreshExpiration, domain.ScopeRefresh)
 	if err != nil {
 		return "", "", mapRepositoryError(err)
 	}
@@ -219,17 +222,17 @@ func (s *identityService) RefreshToken(oldRefreshToken string) (refreshTokenStri
 }
 
 func (s *identityService) Logout(userId int64) error {
-	err := s.cfg.OpaqueTokenRepository.DeleteAllFromUser(domain.ScopeRefresh, userId)
+	err := s.cfg.OpaqueTokensRepository.DeleteAllFromUser(domain.ScopeRefresh, userId)
 	return mapRepositoryError(err)
 }
 
 func (s *identityService) GetUserById(userId int64) (*domain.UserDetails, error) {
-	user, err := s.cfg.UserRepository.GetUserById(userId)
+	user, err := s.cfg.UsersRepository.GetUserById(userId)
 	if err != nil {
 		return nil, mapRepositoryError(err)
 	}
 
-	roles, err := s.cfg.UserRepository.GetAllRolesForUser(user.ID)
+	roles, err := s.cfg.RolesRepository.GetAllRolesForUser(user.ID)
 	if err != nil {
 		return nil, ErrUserWithoutRoles
 	}

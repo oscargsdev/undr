@@ -51,13 +51,14 @@ func New(cfg Config) (*Module, error) {
 	repo := postgres.NewRepository(cfg.DB, cfg.DBTimeout, cfg.Logger)
 
 	svcConfig := service.Config{
-		UserRepository:        repo,
-		OpaqueTokenRepository: repo,
-		Logger:                cfg.Logger,
-		Issuer:                cfg.Issuer,
-		JWTExpiration:         cfg.JWTExpiration,
-		RefreshExpiration:     cfg.RefreshExpiration,
-		ActivationExpiration:  cfg.ActivationExpiration,
+		UsersRepository:        repo,
+		OpaqueTokensRepository: repo,
+		RolesRepository:        repo,
+		Logger:                 cfg.Logger,
+		Issuer:                 cfg.Issuer,
+		JWTExpiration:          cfg.JWTExpiration,
+		RefreshExpiration:      cfg.RefreshExpiration,
+		ActivationExpiration:   cfg.ActivationExpiration,
 	}
 	svc, err := service.New(svcConfig)
 	if err != nil {
