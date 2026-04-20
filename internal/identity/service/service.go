@@ -1,16 +1,36 @@
 package service
 
 import (
+	"context"
+	"crypto/rand"
 	"crypto/rsa"
 	"encoding/json"
 	"errors"
 	"log/slog"
 	"net/http"
+	"strconv"
 	"time"
 
 	"github.com/MicahParks/jwkset"
+	"github.com/golang-jwt/jwt/v5"
 	"github.com/oscargsdev/undr/internal/identity/domain"
 	"github.com/oscargsdev/undr/internal/identity/postgres"
+)
+
+const userIdContextKey = contextKey("userId")
+const rolesContextKey = contextKey("roles")
+
+var (
+	ErrInvalidCredentials        = errors.New("invalid credentials")
+	ErrUserNotActivated          = errors.New("user not activated")
+	ErrUserWithoutRoles          = errors.New("the user has no roles")
+	ErrDuplicateEmail            = errors.New("duplicate email")
+	ErrDuplicateUsername         = errors.New("duplicate username")
+	ErrRecordNotFound            = errors.New("record not found")
+	ErrEditConflict              = errors.New("edit conflict")
+	ErrUnknownClaims             = errors.New("unknown claims")
+	ErrMissingUserIDInContext    = errors.New("missing user id in context")
+	ErrMissingUserRolesInContext = errors.New("missing user roles in context")
 )
 
 type usersRepository interface {
@@ -31,30 +51,12 @@ type rolesRepository interface {
 	AddRoleForUser(userID int64, codes ...string) error
 }
 
-var (
-	ErrInvalidCredentials = errors.New("invalid credentials")
-	ErrUserNotActivated   = errors.New("user not activated")
-	ErrUserWithoutRoles   = errors.New("the user has no roles")
-	ErrDuplicateEmail     = errors.New("duplicate email")
-	ErrDuplicateUsername  = errors.New("duplicate username")
-	ErrRecordNotFound     = errors.New("record not found")
-	ErrEditConflict       = errors.New("edit conflict")
-)
-
-func mapRepositoryError(err error) error {
-	switch {
-	case errors.Is(err, postgres.ErrDuplicateEmail):
-		return ErrDuplicateEmail
-	case errors.Is(err, postgres.ErrDuplicateUsername):
-		return ErrDuplicateUsername
-	case errors.Is(err, postgres.ErrRecordNotFound):
-		return ErrRecordNotFound
-	case errors.Is(err, postgres.ErrEditConflict):
-		return ErrEditConflict
-	default:
-		return err
-	}
+type claims struct {
+	Roles []string `json:"roles"`
+	jwt.RegisteredClaims
 }
+
+type contextKey string
 
 type Config struct {
 	UsersRepository        usersRepository
@@ -71,6 +73,21 @@ type identityService struct {
 	cfg        Config
 	jwkStore   jwkset.Storage
 	privateKey *rsa.PrivateKey
+}
+
+func mapRepositoryError(err error) error {
+	switch {
+	case errors.Is(err, postgres.ErrDuplicateEmail):
+		return ErrDuplicateEmail
+	case errors.Is(err, postgres.ErrDuplicateUsername):
+		return ErrDuplicateUsername
+	case errors.Is(err, postgres.ErrRecordNotFound):
+		return ErrRecordNotFound
+	case errors.Is(err, postgres.ErrEditConflict):
+		return ErrEditConflict
+	default:
+		return err
+	}
 }
 
 func New(cfg Config) (*identityService, error) {
@@ -258,4 +275,111 @@ func (s *identityService) GetJWKS(r *http.Request) (json.RawMessage, error) {
 	}
 
 	return response, nil
+}
+
+func (s *identityService) initJWKS() (*rsa.PrivateKey, jwkset.Storage, error) {
+	ctx := context.Background()
+	jwkStore := jwkset.NewMemoryStorage()
+
+	privateKey, err := rsa.GenerateKey(rand.Reader, 2048)
+	if err != nil {
+		s.cfg.Logger.Error("failed to generate RSA key")
+		return nil, nil, err
+	}
+
+	metadata := jwkset.JWKMetadataOptions{
+		KID: "my-key-id",
+	}
+	options := jwkset.JWKOptions{
+		Metadata: metadata,
+	}
+
+	jwk, err := jwkset.NewJWKFromKey(privateKey, options)
+	if err != nil {
+		s.cfg.Logger.Error("failed to create JWK from key")
+		return nil, nil, err
+	}
+
+	err = jwkStore.KeyWrite(ctx, jwk)
+	if err != nil {
+		s.cfg.Logger.Error("failed to store RSA key")
+		return nil, nil, err
+	}
+
+	return privateKey, jwkStore, nil
+}
+
+func (s *identityService) newAccessToken(userID int64, roles domain.Roles, expiration time.Duration, issuer string) (string, error) {
+	claims := claims{
+		Roles: roles,
+		RegisteredClaims: jwt.RegisteredClaims{
+			ExpiresAt: jwt.NewNumericDate(time.Now().Add(expiration)),
+			Issuer:    issuer,
+			Subject:   strconv.FormatInt(userID, 10),
+		},
+	}
+
+	token := jwt.NewWithClaims(jwt.SigningMethodRS256, claims)
+	tokenString, err := token.SignedString(s.privateKey)
+
+	if err != nil {
+		return "", err
+	}
+
+	return tokenString, nil
+}
+
+func (s *identityService) ValidateJWTToken(tokenString string, issuer string) (*jwt.Token, error) {
+	fn := func(token *jwt.Token) (any, error) {
+		return s.privateKey.Public(), nil
+	}
+
+	token, err := jwt.ParseWithClaims(tokenString, &claims{}, fn, jwt.WithIssuer(issuer),
+		jwt.WithValidMethods([]string{jwt.SigningMethodRS256.Name}))
+
+	if token == nil {
+		return nil, jwt.ErrTokenMalformed
+	}
+
+	if !token.Valid {
+		return nil, err
+	}
+
+	if _, ok := token.Claims.(*claims); ok {
+		return token, nil
+	} else {
+		return nil, ErrUnknownClaims
+	}
+}
+
+func ContextSetClaims(r *http.Request, token *jwt.Token) *http.Request {
+	userId, _ := token.Claims.GetSubject()
+	roles := token.Claims.(*claims).Roles
+
+	ctx := context.WithValue(r.Context(), userIdContextKey, userId)
+	ctx = context.WithValue(ctx, rolesContextKey, roles)
+
+	return r.WithContext(ctx)
+}
+
+func ContextGetUserId(r *http.Request) (int64, error) {
+	userId, ok := r.Context().Value(userIdContextKey).(string)
+	if !ok {
+		return -1, ErrMissingUserIDInContext
+	}
+
+	id, err := strconv.ParseInt(userId, 10, 64)
+	if err != nil {
+		return -1, err
+	}
+	return id, nil
+}
+
+func ContextGetRoles(r *http.Request) ([]string, error) {
+	roles, ok := r.Context().Value(rolesContextKey).([]string)
+	if !ok {
+		return nil, ErrMissingUserRolesInContext
+	}
+
+	return roles, nil
 }

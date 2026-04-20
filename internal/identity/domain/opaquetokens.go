@@ -1,8 +1,6 @@
 package domain
 
 import (
-	"crypto/rand"
-	"crypto/sha256"
 	"errors"
 	"time"
 
@@ -24,20 +22,6 @@ type OpaqueToken struct {
 	UserID    int64     `json:"-"`
 	Expiry    time.Time `json:"expiry"`
 	Scope     string    `json:"-"`
-}
-
-func GenerateOpaqueToken(userID int64, ttl time.Duration, scope string) *OpaqueToken {
-	token := &OpaqueToken{
-		Plaintext: rand.Text(),
-		UserID:    userID,
-		Expiry:    time.Now().Add(ttl),
-		Scope:     scope,
-	}
-
-	hash := sha256.Sum256([]byte(token.Plaintext))
-	token.Hash = hash[:]
-
-	return token
 }
 
 func ValidateOpaqueTokenPlaintext(v *validator.Validator, tokenPlaintext string) {
