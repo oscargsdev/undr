@@ -224,7 +224,7 @@ func (h *Handler) refreshTokenHandler(w http.ResponseWriter, r *http.Request) {
 	v := validator.New()
 
 	if domain.ValidateOpaqueTokenPlaintext(v, oldToken); !v.Valid() {
-		h.errorResponses.InvalidRefresTokenResponse(w, r, v.Errors)
+		h.errorResponses.InvalidRefreshTokenResponse(w, r, v.Errors)
 		return
 	}
 
