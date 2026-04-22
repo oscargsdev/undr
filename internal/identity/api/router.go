@@ -4,7 +4,7 @@ import (
 	"net/http"
 )
 
-func NewRouter(handler Handler) http.Handler {
+func NewRouter(handler *Handler) http.Handler {
 	mux := http.NewServeMux()
 
 	mux.HandleFunc("POST /register", handler.registerUserHandler)
