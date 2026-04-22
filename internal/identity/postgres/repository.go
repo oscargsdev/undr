@@ -34,6 +34,26 @@ var (
 	ErrEditConflict      = errors.New("edit conflict")
 )
 
+func mapUniqueViolation(err error) error {
+	var pqErr *pq.Error
+	if !errors.As(err, &pqErr) {
+		return err
+	}
+
+	if pqErr.Code != "23505" {
+		return err
+	}
+
+	switch pqErr.Constraint {
+	case "users_email_key":
+		return ErrDuplicateEmail
+	case "users_username_key":
+		return ErrDuplicateUsername
+	default:
+		return err
+	}
+}
+
 func (r *repository) InsertUser(user *domain.User) error {
 	query := `
         INSERT INTO users (username, email, password_hash, activated) 
@@ -47,14 +67,7 @@ func (r *repository) InsertUser(user *domain.User) error {
 
 	err := r.db.QueryRowContext(ctx, query, args...).Scan(&user.ID, &user.CreatedAt, &user.Version)
 	if err != nil {
-		switch {
-		case err.Error() == `pq: duplicate key value violates unique constraint "users_email_key" (23505)`:
-			return ErrDuplicateEmail
-		case err.Error() == `pq: duplicate key value violates unique constraint "users_username_key" (23505)`:
-			return ErrDuplicateUsername
-		default:
-			return err
-		}
+		return mapUniqueViolation(err)
 	}
 
 	return nil
@@ -82,12 +95,10 @@ func (r *repository) UpdateUser(user *domain.User) error {
 	err := r.db.QueryRowContext(ctx, query, args...).Scan(&user.Version)
 	if err != nil {
 		switch {
-		case err.Error() == `pq: duplicate key value violates unique constraint "users_email_key"`:
-			return ErrDuplicateEmail
 		case errors.Is(err, sql.ErrNoRows):
 			return ErrEditConflict
 		default:
-			return err
+			return mapUniqueViolation(err)
 		}
 	}
 
