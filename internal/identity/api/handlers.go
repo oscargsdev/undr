@@ -161,7 +161,10 @@ func (h *Handler) testSecuredEndpoint(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	jsonx.WriteJSON(w, http.StatusOK, jsonx.Envelope{"userId": userId, "roles": roles}, nil)
+	err = jsonx.WriteJSON(w, http.StatusOK, jsonx.Envelope{"userId": userId, "roles": roles}, nil)
+	if err != nil {
+		h.errorResponses.ServerErrorResponse(w, r, err)
+	}
 }
 
 func (h *Handler) authenticateUserHandler(w http.ResponseWriter, r *http.Request) {
@@ -263,7 +266,10 @@ func (h *Handler) logoutHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *Handler) OnlyAdminsHandler(w http.ResponseWriter, r *http.Request) {
-	jsonx.WriteJSON(w, http.StatusOK, jsonx.Envelope{"howdy": "you are an admin!"}, nil)
+	err := jsonx.WriteJSON(w, http.StatusOK, jsonx.Envelope{"howdy": "you are an admin!"}, nil)
+	if err != nil {
+		h.errorResponses.ServerErrorResponse(w, r, err)
+	}
 }
 
 func (h *Handler) MyInfoHandler(w http.ResponseWriter, r *http.Request) {
