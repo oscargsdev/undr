@@ -33,7 +33,7 @@ func (h *ErrorResponseHelper) errorResponse(w http.ResponseWriter, r *http.Reque
 	err := jsonUtils.WriteJSON(w, status, env, nil)
 	if err != nil {
 		h.logError(r, err)
-		w.WriteHeader(500)
+		w.WriteHeader(http.StatusInternalServerError)
 	}
 }
 
