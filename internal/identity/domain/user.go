@@ -8,8 +8,6 @@ import (
 	"golang.org/x/crypto/bcrypt"
 )
 
-var AnonymousUser = &User{}
-
 type User struct {
 	ID        int64     `json:"id"`
 	CreatedAt time.Time `json:"created_at"`
@@ -24,14 +22,6 @@ type UserDetails struct {
 	User
 	Roles `json:"roles"`
 }
-
-func (u *User) IsAnonymous() bool {
-	return u == AnonymousUser
-}
-
-var (
-	ErrDuplicateEmail = errors.New("duplicate email")
-)
 
 type Password struct {
 	Plaintext *string

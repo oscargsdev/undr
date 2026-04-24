@@ -7,21 +7,6 @@ import (
 	"github.com/oscargsdev/undr/internal/validator"
 )
 
-func TestUserIsAnonymous(t *testing.T) {
-	t.Run("anonymous user singleton is anonymous", func(t *testing.T) {
-		if !AnonymousUser.IsAnonymous() {
-			t.Fatal("expected AnonymousUser to be anonymous")
-		}
-	})
-
-	t.Run("different user pointer is not anonymous", func(t *testing.T) {
-		user := &User{}
-		if user.IsAnonymous() {
-			t.Fatal("expected non-singleton user pointer to be non-anonymous")
-		}
-	})
-}
-
 func TestPasswordSetAndMatches(t *testing.T) {
 	var password Password
 
