@@ -32,7 +32,7 @@ type IdentityService interface {
 type Handler struct {
 	service        IdentityService
 	logger         *slog.Logger
-	errorResponses *responses.ErrorResponseHelper
+	errorResponses *responses.Responder
 }
 
 func newRefreshTokenCookie(refreshToken string, expires time.Time) *http.Cookie {
@@ -51,8 +51,12 @@ func NewHandler(svc IdentityService, logger *slog.Logger) *Handler {
 	return &Handler{
 		service:        svc,
 		logger:         logger,
-		errorResponses: responses.New(logger),
+		errorResponses: responses.New(),
 	}
+}
+
+func (h *Handler) logError(r *http.Request, err error) {
+	h.logger.Error(err.Error(), "method", r.Method, "uri", r.URL.RequestURI())
 }
 
 func (h *Handler) registerUserHandler(w http.ResponseWriter, r *http.Request) {
@@ -76,6 +80,7 @@ func (h *Handler) registerUserHandler(w http.ResponseWriter, r *http.Request) {
 
 	err = user.Password.Set(input.Password)
 	if err != nil {
+		h.logError(r, err)
 		h.errorResponses.ServerErrorResponse(w, r, err)
 		return
 	}
@@ -97,6 +102,7 @@ func (h *Handler) registerUserHandler(w http.ResponseWriter, r *http.Request) {
 			v.AddError("username", "a user with this username already exists")
 			h.errorResponses.FailedValidationResponse(w, r, v.Errors)
 		default:
+			h.logError(r, err)
 			h.errorResponses.ServerErrorResponse(w, r, err)
 		}
 		return
@@ -104,6 +110,7 @@ func (h *Handler) registerUserHandler(w http.ResponseWriter, r *http.Request) {
 
 	err = jsonx.WriteJSON(w, http.StatusAccepted, jsonx.Envelope{"user": user, "activation_token": activationToken.Plaintext}, nil)
 	if err != nil {
+		h.logError(r, err)
 		h.errorResponses.ServerErrorResponse(w, r, err)
 	}
 }
@@ -135,6 +142,7 @@ func (h *Handler) activateUserHandler(w http.ResponseWriter, r *http.Request) {
 		case errors.Is(err, service.ErrEditConflict):
 			h.errorResponses.EditConflictResponse(w, r)
 		default:
+			h.logError(r, err)
 			h.errorResponses.ServerErrorResponse(w, r, err)
 		}
 		return
@@ -144,6 +152,7 @@ func (h *Handler) activateUserHandler(w http.ResponseWriter, r *http.Request) {
 
 	err = jsonx.WriteJSON(w, http.StatusOK, jsonx.Envelope{"access_token": accessToken}, nil)
 	if err != nil {
+		h.logError(r, err)
 		h.errorResponses.ServerErrorResponse(w, r, err)
 	}
 }
@@ -163,6 +172,7 @@ func (h *Handler) testSecuredEndpoint(w http.ResponseWriter, r *http.Request) {
 
 	err = jsonx.WriteJSON(w, http.StatusOK, jsonx.Envelope{"userId": userId, "roles": roles}, nil)
 	if err != nil {
+		h.logError(r, err)
 		h.errorResponses.ServerErrorResponse(w, r, err)
 	}
 }
@@ -199,6 +209,7 @@ func (h *Handler) authenticateUserHandler(w http.ResponseWriter, r *http.Request
 		case errors.Is(err, service.ErrUserNotActivated):
 			h.errorResponses.InactiveAccountResponse(w, r)
 		default:
+			h.logError(r, err)
 			h.errorResponses.ServerErrorResponse(w, r, err)
 		}
 		return
@@ -208,6 +219,7 @@ func (h *Handler) authenticateUserHandler(w http.ResponseWriter, r *http.Request
 
 	err = jsonx.WriteJSON(w, http.StatusOK, jsonx.Envelope{"access_token": accessToken}, nil)
 	if err != nil {
+		h.logError(r, err)
 		h.errorResponses.ServerErrorResponse(w, r, err)
 	}
 }
@@ -234,6 +246,7 @@ func (h *Handler) refreshTokenHandler(w http.ResponseWriter, r *http.Request) {
 		case errors.Is(err, service.ErrRecordNotFound):
 			h.errorResponses.BadRequestResponse(w, r, domain.ErrInvalidRefreshToken)
 		default:
+			h.logError(r, err)
 			h.errorResponses.ServerErrorResponse(w, r, err)
 		}
 		return
@@ -243,6 +256,7 @@ func (h *Handler) refreshTokenHandler(w http.ResponseWriter, r *http.Request) {
 
 	err = jsonx.WriteJSON(w, http.StatusOK, jsonx.Envelope{"access_token": accessToken}, nil)
 	if err != nil {
+		h.logError(r, err)
 		h.errorResponses.ServerErrorResponse(w, r, err)
 	}
 }
@@ -256,6 +270,7 @@ func (h *Handler) logoutHandler(w http.ResponseWriter, r *http.Request) {
 
 	err = h.service.Logout(userId)
 	if err != nil {
+		h.logError(r, err)
 		h.errorResponses.ServerErrorResponse(w, r, err)
 		return
 	}
@@ -268,6 +283,7 @@ func (h *Handler) logoutHandler(w http.ResponseWriter, r *http.Request) {
 func (h *Handler) OnlyAdminsHandler(w http.ResponseWriter, r *http.Request) {
 	err := jsonx.WriteJSON(w, http.StatusOK, jsonx.Envelope{"howdy": "you are an admin!"}, nil)
 	if err != nil {
+		h.logError(r, err)
 		h.errorResponses.ServerErrorResponse(w, r, err)
 	}
 }
@@ -296,8 +312,10 @@ func (h *Handler) MyInfoHandler(w http.ResponseWriter, r *http.Request) {
 		case errors.Is(err, service.ErrRecordNotFound):
 			h.errorResponses.NotFoundResponse(w, r)
 		case errors.Is(err, service.ErrUserWithoutRoles):
+			h.logError(r, err)
 			h.errorResponses.ServerErrorResponse(w, r, err)
 		default:
+			h.logError(r, err)
 			h.errorResponses.ServerErrorResponse(w, r, err)
 		}
 		return
@@ -305,6 +323,7 @@ func (h *Handler) MyInfoHandler(w http.ResponseWriter, r *http.Request) {
 
 	err = jsonx.WriteJSON(w, http.StatusOK, jsonx.Envelope{"user_details": user}, nil)
 	if err != nil {
+		h.logError(r, err)
 		h.errorResponses.ServerErrorResponse(w, r, err)
 	}
 }
@@ -312,12 +331,14 @@ func (h *Handler) MyInfoHandler(w http.ResponseWriter, r *http.Request) {
 func (h *Handler) JWKS(w http.ResponseWriter, r *http.Request) {
 	response, err := h.service.GetJWKS(r)
 	if err != nil {
+		h.logError(r, err)
 		h.errorResponses.ServerErrorResponse(w, r, err)
 		return
 	}
 
 	err = jsonx.WriteJSON(w, http.StatusOK, jsonx.Envelope{"jwks": response}, nil)
 	if err != nil {
+		h.logError(r, err)
 		h.errorResponses.ServerErrorResponse(w, r, err)
 	}
 }

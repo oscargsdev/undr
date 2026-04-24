@@ -40,6 +40,7 @@ func (h *Handler) AuthorizationMiddleware(next http.Handler) http.Handler {
 				errors.Is(err, service.ErrUnknownClaims):
 				h.errorResponses.InvalidAccessTokenResponse(w, r)
 			default:
+				h.logError(r, err)
 				h.errorResponses.ServerErrorResponse(w, r, err)
 
 			}
