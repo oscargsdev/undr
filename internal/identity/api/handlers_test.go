@@ -665,12 +665,12 @@ func TestHandler_LogoutHandler(t *testing.T) {
 	})
 }
 
-func TestHandler_OnlyAdminsHandler(t *testing.T) {
+func TestHandler_onlyAdminsHandler(t *testing.T) {
 	handler := newTestHandler(&mockIdentityService{})
 	req := httptest.NewRequest(http.MethodGet, "/admin-portal", nil)
 	rr := httptest.NewRecorder()
 
-	handler.OnlyAdminsHandler(rr, req)
+	handler.onlyAdminsHandler(rr, req)
 
 	assertStatus(t, rr, http.StatusOK)
 	response := decodeJSONResponse(t, rr)
@@ -679,7 +679,7 @@ func TestHandler_OnlyAdminsHandler(t *testing.T) {
 	}
 }
 
-func TestHandler_MyInfoHandler(t *testing.T) {
+func TestHandler_myInfoHandler(t *testing.T) {
 	tests := []struct {
 		name       string
 		pathUserID string
@@ -840,7 +840,7 @@ func TestHandler_MyInfoHandler(t *testing.T) {
 
 			rr := httptest.NewRecorder()
 
-			handler.MyInfoHandler(rr, req)
+			handler.myInfoHandler(rr, req)
 
 			assertStatus(t, rr, tt.wantStatus)
 			tt.assert(t, rr, svc)
@@ -859,7 +859,7 @@ func TestHandler_JWKS(t *testing.T) {
 		req := httptest.NewRequest(http.MethodGet, "/jwks.json", nil)
 		rr := httptest.NewRecorder()
 
-		handler.JWKS(rr, req)
+		handler.jwksHandler(rr, req)
 
 		assertStatus(t, rr, http.StatusInternalServerError)
 		assertExactError(t, rr, "the server encountered an error and could not process your request")
@@ -878,7 +878,7 @@ func TestHandler_JWKS(t *testing.T) {
 		req := httptest.NewRequest(http.MethodGet, "/jwks.json", nil)
 		rr := httptest.NewRecorder()
 
-		handler.JWKS(rr, req)
+		handler.jwksHandler(rr, req)
 
 		assertStatus(t, rr, http.StatusOK)
 		if svc.getJWKSCalls != 1 {

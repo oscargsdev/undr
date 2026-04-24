@@ -29,10 +29,10 @@ type IdentityService interface {
 	ValidateJWTToken(tokenString string, issuer string) (*jwt.Token, error)
 }
 
-type Handler struct {
-	service        IdentityService
-	logger         *slog.Logger
-	errorResponses *responses.Responder
+type handler struct {
+	service   IdentityService
+	logger    *slog.Logger
+	responder *responses.Responder
 }
 
 func newRefreshTokenCookie(refreshToken string, expires time.Time) *http.Cookie {
@@ -47,19 +47,19 @@ func newRefreshTokenCookie(refreshToken string, expires time.Time) *http.Cookie 
 	}
 }
 
-func NewHandler(svc IdentityService, logger *slog.Logger) *Handler {
-	return &Handler{
-		service:        svc,
-		logger:         logger,
-		errorResponses: responses.New(),
+func newHandler(svc IdentityService, logger *slog.Logger) *handler {
+	return &handler{
+		service:   svc,
+		logger:    logger,
+		responder: responses.New(),
 	}
 }
 
-func (h *Handler) logError(r *http.Request, err error) {
+func (h *handler) logError(r *http.Request, err error) {
 	h.logger.Error(err.Error(), "method", r.Method, "uri", r.URL.RequestURI())
 }
 
-func (h *Handler) registerUserHandler(w http.ResponseWriter, r *http.Request) {
+func (h *handler) registerUserHandler(w http.ResponseWriter, r *http.Request) {
 	var input struct {
 		Username string `json:"username"`
 		Email    string `json:"email"`
@@ -68,7 +68,7 @@ func (h *Handler) registerUserHandler(w http.ResponseWriter, r *http.Request) {
 
 	err := jsonx.ReadJSON(w, r, &input)
 	if err != nil {
-		h.errorResponses.BadRequestResponse(w, r, err)
+		h.responder.BadRequestResponse(w, r, err)
 		return
 	}
 
@@ -81,14 +81,14 @@ func (h *Handler) registerUserHandler(w http.ResponseWriter, r *http.Request) {
 	err = user.Password.Set(input.Password)
 	if err != nil {
 		h.logError(r, err)
-		h.errorResponses.ServerErrorResponse(w, r, err)
+		h.responder.ServerErrorResponse(w, r, err)
 		return
 	}
 
 	v := validator.New()
 
 	if domain.ValidateUser(v, user); !v.Valid() {
-		h.errorResponses.FailedValidationResponse(w, r, v.Errors)
+		h.responder.FailedValidationResponse(w, r, v.Errors)
 		return
 	}
 
@@ -97,13 +97,13 @@ func (h *Handler) registerUserHandler(w http.ResponseWriter, r *http.Request) {
 		switch {
 		case errors.Is(err, service.ErrDuplicateEmail):
 			v.AddError("email", "a user with this email address already exists")
-			h.errorResponses.FailedValidationResponse(w, r, v.Errors)
+			h.responder.FailedValidationResponse(w, r, v.Errors)
 		case errors.Is(err, service.ErrDuplicateUsername):
 			v.AddError("username", "a user with this username already exists")
-			h.errorResponses.FailedValidationResponse(w, r, v.Errors)
+			h.responder.FailedValidationResponse(w, r, v.Errors)
 		default:
 			h.logError(r, err)
-			h.errorResponses.ServerErrorResponse(w, r, err)
+			h.responder.ServerErrorResponse(w, r, err)
 		}
 		return
 	}
@@ -111,25 +111,25 @@ func (h *Handler) registerUserHandler(w http.ResponseWriter, r *http.Request) {
 	err = jsonx.WriteJSON(w, http.StatusAccepted, jsonx.Envelope{"user": user, "activation_token": activationToken.Plaintext}, nil)
 	if err != nil {
 		h.logError(r, err)
-		h.errorResponses.ServerErrorResponse(w, r, err)
+		h.responder.ServerErrorResponse(w, r, err)
 	}
 }
 
-func (h *Handler) activateUserHandler(w http.ResponseWriter, r *http.Request) {
+func (h *handler) activateUserHandler(w http.ResponseWriter, r *http.Request) {
 	var input struct {
 		TokenPlainText string `json:"activationToken"`
 	}
 
 	err := jsonx.ReadJSON(w, r, &input)
 	if err != nil {
-		h.errorResponses.BadRequestResponse(w, r, err)
+		h.responder.BadRequestResponse(w, r, err)
 		return
 	}
 
 	v := validator.New()
 
 	if domain.ValidateOpaqueTokenPlaintext(v, input.TokenPlainText); !v.Valid() {
-		h.errorResponses.FailedValidationResponse(w, r, v.Errors)
+		h.responder.FailedValidationResponse(w, r, v.Errors)
 		return
 	}
 
@@ -138,12 +138,12 @@ func (h *Handler) activateUserHandler(w http.ResponseWriter, r *http.Request) {
 		switch {
 		case errors.Is(err, service.ErrRecordNotFound):
 			v.AddError("token", "invalid or expired activation token")
-			h.errorResponses.FailedValidationResponse(w, r, v.Errors)
+			h.responder.FailedValidationResponse(w, r, v.Errors)
 		case errors.Is(err, service.ErrEditConflict):
-			h.errorResponses.EditConflictResponse(w, r)
+			h.responder.EditConflictResponse(w, r)
 		default:
 			h.logError(r, err)
-			h.errorResponses.ServerErrorResponse(w, r, err)
+			h.responder.ServerErrorResponse(w, r, err)
 		}
 		return
 	}
@@ -153,31 +153,31 @@ func (h *Handler) activateUserHandler(w http.ResponseWriter, r *http.Request) {
 	err = jsonx.WriteJSON(w, http.StatusOK, jsonx.Envelope{"access_token": accessToken}, nil)
 	if err != nil {
 		h.logError(r, err)
-		h.errorResponses.ServerErrorResponse(w, r, err)
+		h.responder.ServerErrorResponse(w, r, err)
 	}
 }
 
-func (h *Handler) testSecuredEndpoint(w http.ResponseWriter, r *http.Request) {
+func (h *handler) testSecuredEndpoint(w http.ResponseWriter, r *http.Request) {
 	userId, err := service.ContextGetUserId(r)
 	if err != nil {
-		h.errorResponses.AuthenticationRequiredResponse(w, r)
+		h.responder.AuthenticationRequiredResponse(w, r)
 		return
 	}
 
 	roles, err := service.ContextGetRoles(r)
 	if err != nil {
-		h.errorResponses.AuthenticationRequiredResponse(w, r)
+		h.responder.AuthenticationRequiredResponse(w, r)
 		return
 	}
 
 	err = jsonx.WriteJSON(w, http.StatusOK, jsonx.Envelope{"userId": userId, "roles": roles}, nil)
 	if err != nil {
 		h.logError(r, err)
-		h.errorResponses.ServerErrorResponse(w, r, err)
+		h.responder.ServerErrorResponse(w, r, err)
 	}
 }
 
-func (h *Handler) authenticateUserHandler(w http.ResponseWriter, r *http.Request) {
+func (h *handler) authenticateUserHandler(w http.ResponseWriter, r *http.Request) {
 	var input struct {
 		Email    string `json:"email"`
 		Password string `json:"password"`
@@ -185,7 +185,7 @@ func (h *Handler) authenticateUserHandler(w http.ResponseWriter, r *http.Request
 
 	err := jsonx.ReadJSON(w, r, &input)
 	if err != nil {
-		h.errorResponses.BadRequestResponse(w, r, err)
+		h.responder.BadRequestResponse(w, r, err)
 		return
 	}
 
@@ -195,7 +195,7 @@ func (h *Handler) authenticateUserHandler(w http.ResponseWriter, r *http.Request
 	domain.ValidatePassword(v, input.Password)
 
 	if !v.Valid() {
-		h.errorResponses.FailedValidationResponse(w, r, v.Errors)
+		h.responder.FailedValidationResponse(w, r, v.Errors)
 		return
 	}
 
@@ -203,14 +203,14 @@ func (h *Handler) authenticateUserHandler(w http.ResponseWriter, r *http.Request
 	if err != nil {
 		switch {
 		case errors.Is(err, service.ErrRecordNotFound):
-			h.errorResponses.InvalidCredentialsResponse(w, r)
+			h.responder.InvalidCredentialsResponse(w, r)
 		case errors.Is(err, service.ErrInvalidCredentials):
-			h.errorResponses.InvalidCredentialsResponse(w, r)
+			h.responder.InvalidCredentialsResponse(w, r)
 		case errors.Is(err, service.ErrUserNotActivated):
-			h.errorResponses.InactiveAccountResponse(w, r)
+			h.responder.InactiveAccountResponse(w, r)
 		default:
 			h.logError(r, err)
-			h.errorResponses.ServerErrorResponse(w, r, err)
+			h.responder.ServerErrorResponse(w, r, err)
 		}
 		return
 	}
@@ -220,14 +220,14 @@ func (h *Handler) authenticateUserHandler(w http.ResponseWriter, r *http.Request
 	err = jsonx.WriteJSON(w, http.StatusOK, jsonx.Envelope{"access_token": accessToken}, nil)
 	if err != nil {
 		h.logError(r, err)
-		h.errorResponses.ServerErrorResponse(w, r, err)
+		h.responder.ServerErrorResponse(w, r, err)
 	}
 }
 
-func (h *Handler) refreshTokenHandler(w http.ResponseWriter, r *http.Request) {
+func (h *handler) refreshTokenHandler(w http.ResponseWriter, r *http.Request) {
 	refreshTokenCookie, err := r.Cookie("refresh_token")
 	if err != nil {
-		h.errorResponses.BadRequestResponse(w, r, err)
+		h.responder.BadRequestResponse(w, r, err)
 		return
 	}
 
@@ -236,7 +236,7 @@ func (h *Handler) refreshTokenHandler(w http.ResponseWriter, r *http.Request) {
 	v := validator.New()
 
 	if domain.ValidateOpaqueTokenPlaintext(v, oldToken); !v.Valid() {
-		h.errorResponses.InvalidRefreshTokenResponse(w, r, v.Errors)
+		h.responder.InvalidRefreshTokenResponse(w, r, v.Errors)
 		return
 	}
 
@@ -244,10 +244,10 @@ func (h *Handler) refreshTokenHandler(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		switch {
 		case errors.Is(err, service.ErrRecordNotFound):
-			h.errorResponses.BadRequestResponse(w, r, domain.ErrInvalidRefreshToken)
+			h.responder.BadRequestResponse(w, r, domain.ErrInvalidRefreshToken)
 		default:
 			h.logError(r, err)
-			h.errorResponses.ServerErrorResponse(w, r, err)
+			h.responder.ServerErrorResponse(w, r, err)
 		}
 		return
 	}
@@ -257,21 +257,21 @@ func (h *Handler) refreshTokenHandler(w http.ResponseWriter, r *http.Request) {
 	err = jsonx.WriteJSON(w, http.StatusOK, jsonx.Envelope{"access_token": accessToken}, nil)
 	if err != nil {
 		h.logError(r, err)
-		h.errorResponses.ServerErrorResponse(w, r, err)
+		h.responder.ServerErrorResponse(w, r, err)
 	}
 }
 
-func (h *Handler) logoutHandler(w http.ResponseWriter, r *http.Request) {
+func (h *handler) logoutHandler(w http.ResponseWriter, r *http.Request) {
 	userId, err := service.ContextGetUserId(r)
 	if err != nil {
-		h.errorResponses.AuthenticationRequiredResponse(w, r)
+		h.responder.AuthenticationRequiredResponse(w, r)
 		return
 	}
 
 	err = h.service.Logout(userId)
 	if err != nil {
 		h.logError(r, err)
-		h.errorResponses.ServerErrorResponse(w, r, err)
+		h.responder.ServerErrorResponse(w, r, err)
 		return
 	}
 
@@ -280,29 +280,29 @@ func (h *Handler) logoutHandler(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusNoContent)
 }
 
-func (h *Handler) OnlyAdminsHandler(w http.ResponseWriter, r *http.Request) {
+func (h *handler) onlyAdminsHandler(w http.ResponseWriter, r *http.Request) {
 	err := jsonx.WriteJSON(w, http.StatusOK, jsonx.Envelope{"howdy": "you are an admin!"}, nil)
 	if err != nil {
 		h.logError(r, err)
-		h.errorResponses.ServerErrorResponse(w, r, err)
+		h.responder.ServerErrorResponse(w, r, err)
 	}
 }
 
-func (h *Handler) MyInfoHandler(w http.ResponseWriter, r *http.Request) {
+func (h *handler) myInfoHandler(w http.ResponseWriter, r *http.Request) {
 	pathUserId, err := strconv.ParseInt(r.PathValue("userId"), 10, 64)
 	if err != nil {
-		h.errorResponses.BadRequestResponse(w, r, err)
+		h.responder.BadRequestResponse(w, r, err)
 		return
 	}
 
 	contextUserId, err := service.ContextGetUserId(r)
 	if err != nil {
-		h.errorResponses.AuthenticationRequiredResponse(w, r)
+		h.responder.AuthenticationRequiredResponse(w, r)
 		return
 	}
 
 	if pathUserId != contextUserId {
-		h.errorResponses.InvalidCredentialsResponse(w, r)
+		h.responder.InvalidCredentialsResponse(w, r)
 		return
 	}
 
@@ -310,13 +310,13 @@ func (h *Handler) MyInfoHandler(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		switch {
 		case errors.Is(err, service.ErrRecordNotFound):
-			h.errorResponses.NotFoundResponse(w, r)
+			h.responder.NotFoundResponse(w, r)
 		case errors.Is(err, service.ErrUserWithoutRoles):
 			h.logError(r, err)
-			h.errorResponses.ServerErrorResponse(w, r, err)
+			h.responder.ServerErrorResponse(w, r, err)
 		default:
 			h.logError(r, err)
-			h.errorResponses.ServerErrorResponse(w, r, err)
+			h.responder.ServerErrorResponse(w, r, err)
 		}
 		return
 	}
@@ -324,21 +324,21 @@ func (h *Handler) MyInfoHandler(w http.ResponseWriter, r *http.Request) {
 	err = jsonx.WriteJSON(w, http.StatusOK, jsonx.Envelope{"user_details": user}, nil)
 	if err != nil {
 		h.logError(r, err)
-		h.errorResponses.ServerErrorResponse(w, r, err)
+		h.responder.ServerErrorResponse(w, r, err)
 	}
 }
 
-func (h *Handler) JWKS(w http.ResponseWriter, r *http.Request) {
+func (h *handler) jwksHandler(w http.ResponseWriter, r *http.Request) {
 	response, err := h.service.GetJWKS(r)
 	if err != nil {
 		h.logError(r, err)
-		h.errorResponses.ServerErrorResponse(w, r, err)
+		h.responder.ServerErrorResponse(w, r, err)
 		return
 	}
 
 	err = jsonx.WriteJSON(w, http.StatusOK, jsonx.Envelope{"jwks": response}, nil)
 	if err != nil {
 		h.logError(r, err)
-		h.errorResponses.ServerErrorResponse(w, r, err)
+		h.responder.ServerErrorResponse(w, r, err)
 	}
 }

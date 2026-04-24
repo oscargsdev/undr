@@ -114,8 +114,8 @@ func newTestLogger() *slog.Logger {
 	return slog.New(slog.NewTextHandler(io.Discard, nil))
 }
 
-func newTestHandler(svc IdentityService) *Handler {
-	return NewHandler(svc, newTestLogger())
+func newTestHandler(svc IdentityService) *handler {
+	return newHandler(svc, newTestLogger())
 }
 
 func decodeJSONResponse(t *testing.T, rr *httptest.ResponseRecorder) map[string]any {

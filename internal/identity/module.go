@@ -65,9 +65,6 @@ func New(cfg Config) (*Module, error) {
 		return nil, err
 	}
 
-	handler := api.NewHandler(svc, cfg.Logger)
-	router := api.NewRouter(handler)
-
-	module.Router = router
+	module.Router = api.NewRouter(svc, cfg.Logger)
 	return module, nil
 }

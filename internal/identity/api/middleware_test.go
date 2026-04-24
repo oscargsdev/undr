@@ -10,7 +10,7 @@ import (
 	"github.com/oscargsdev/undr/internal/identity/service"
 )
 
-func TestHandler_AuthorizationMiddleware_InvalidAuthorizationHeader(t *testing.T) {
+func TestHandler_authorizationMiddleware_InvalidAuthorizationHeader(t *testing.T) {
 	tests := []struct {
 		name   string
 		header string
@@ -31,7 +31,7 @@ func TestHandler_AuthorizationMiddleware_InvalidAuthorizationHeader(t *testing.T
 			next := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 				nextCalled = true
 			})
-			mw := handler.AuthorizationMiddleware(next)
+			mw := handler.authorizationMiddleware(next)
 
 			req := httptest.NewRequest(http.MethodGet, "/secured", nil)
 			if tt.header != "" {
@@ -57,7 +57,7 @@ func TestHandler_AuthorizationMiddleware_InvalidAuthorizationHeader(t *testing.T
 	}
 }
 
-func TestHandler_AuthorizationMiddleware_ValidateJWTTokenErrorMapping(t *testing.T) {
+func TestHandler_authorizationMiddleware_ValidateJWTTokenErrorMapping(t *testing.T) {
 	tests := []struct {
 		name        string
 		err         error
@@ -134,7 +134,7 @@ func TestHandler_AuthorizationMiddleware_ValidateJWTTokenErrorMapping(t *testing
 			next := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 				nextCalled = true
 			})
-			mw := handler.AuthorizationMiddleware(next)
+			mw := handler.authorizationMiddleware(next)
 
 			req := httptest.NewRequest(http.MethodGet, "/secured", nil)
 			req.Header.Set("Authorization", "Bearer token-value")
@@ -159,7 +159,7 @@ func TestHandler_AuthorizationMiddleware_ValidateJWTTokenErrorMapping(t *testing
 	}
 }
 
-func TestHandler_AuthorizationMiddleware_SuccessSetsClaimsAndCallsNext(t *testing.T) {
+func TestHandler_authorizationMiddleware_SuccessSetsClaimsAndCallsNext(t *testing.T) {
 	realService, accessToken := newJWTFixtureServiceAndToken(t, 501, []string{"user", "admin"})
 	handler := newTestHandler(realService)
 
@@ -185,7 +185,7 @@ func TestHandler_AuthorizationMiddleware_SuccessSetsClaimsAndCallsNext(t *testin
 
 		w.WriteHeader(http.StatusNoContent)
 	})
-	mw := handler.AuthorizationMiddleware(next)
+	mw := handler.authorizationMiddleware(next)
 
 	req := httptest.NewRequest(http.MethodGet, "/secured", nil)
 	req.Header.Set("Authorization", "Bearer "+accessToken)
@@ -200,7 +200,7 @@ func TestHandler_AuthorizationMiddleware_SuccessSetsClaimsAndCallsNext(t *testin
 	}
 }
 
-func TestHandler_RequireRoleMiddleware(t *testing.T) {
+func TestHandler_requireRoleMiddleware(t *testing.T) {
 	t.Run("invalid auth header is rejected by wrapped authorization middleware", func(t *testing.T) {
 		handler := newTestHandler(&mockIdentityService{})
 
@@ -208,7 +208,7 @@ func TestHandler_RequireRoleMiddleware(t *testing.T) {
 		next := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			nextCalled = true
 		})
-		mw := handler.RequireRoleMiddleware("admin", next)
+		mw := handler.requireRoleMiddleware("admin", next)
 
 		req := httptest.NewRequest(http.MethodGet, "/admin-portal", nil)
 		rr := httptest.NewRecorder()
@@ -230,7 +230,7 @@ func TestHandler_RequireRoleMiddleware(t *testing.T) {
 		next := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			nextCalled = true
 		})
-		mw := handler.RequireRoleMiddleware("admin", next)
+		mw := handler.requireRoleMiddleware("admin", next)
 
 		req := httptest.NewRequest(http.MethodGet, "/admin-portal", nil)
 		req.Header.Set("Authorization", "Bearer "+accessToken)
@@ -254,7 +254,7 @@ func TestHandler_RequireRoleMiddleware(t *testing.T) {
 			nextCalled = true
 			w.WriteHeader(http.StatusAccepted)
 		})
-		mw := handler.RequireRoleMiddleware("admin", next)
+		mw := handler.requireRoleMiddleware("admin", next)
 
 		req := httptest.NewRequest(http.MethodGet, "/admin-portal", nil)
 		req.Header.Set("Authorization", "Bearer "+accessToken)

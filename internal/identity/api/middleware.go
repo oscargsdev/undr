@@ -10,7 +10,7 @@ import (
 	"github.com/oscargsdev/undr/internal/identity/service"
 )
 
-func (h *Handler) AuthorizationMiddleware(next http.Handler) http.Handler {
+func (h *handler) authorizationMiddleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		// This header should only be set for content that is influenced by auth
 		// Be aware of it's usage for public content, as it will reduce cache performance
@@ -20,7 +20,7 @@ func (h *Handler) AuthorizationMiddleware(next http.Handler) http.Handler {
 
 		headerParts := strings.Split(authorizationHeader, " ")
 		if len(headerParts) != 2 || headerParts[0] != "Bearer" {
-			h.errorResponses.InvalidAccessTokenResponse(w, r)
+			h.responder.InvalidAccessTokenResponse(w, r)
 			return
 		}
 
@@ -31,17 +31,17 @@ func (h *Handler) AuthorizationMiddleware(next http.Handler) http.Handler {
 		if err != nil {
 			switch {
 			case errors.Is(err, jwt.ErrTokenMalformed):
-				h.errorResponses.MalformedTokenResponse(w, r)
+				h.responder.MalformedTokenResponse(w, r)
 			case errors.Is(err, jwt.ErrTokenSignatureInvalid) ||
 				errors.Is(err, jwt.ErrTokenExpired) ||
 				errors.Is(err, jwt.ErrTokenNotValidYet) ||
 				errors.Is(err, jwt.ErrTokenInvalidIssuer) ||
 				errors.Is(err, jwt.ErrInvalidKeyType) ||
 				errors.Is(err, service.ErrUnknownClaims):
-				h.errorResponses.InvalidAccessTokenResponse(w, r)
+				h.responder.InvalidAccessTokenResponse(w, r)
 			default:
 				h.logError(r, err)
-				h.errorResponses.ServerErrorResponse(w, r, err)
+				h.responder.ServerErrorResponse(w, r, err)
 
 			}
 			return
@@ -52,21 +52,21 @@ func (h *Handler) AuthorizationMiddleware(next http.Handler) http.Handler {
 	})
 }
 
-func (h *Handler) RequireRoleMiddleware(code string, next http.Handler) http.Handler {
+func (h *handler) requireRoleMiddleware(code string, next http.Handler) http.Handler {
 	fn := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		roles, err := service.ContextGetRoles(r)
 		if err != nil {
-			h.errorResponses.AuthenticationRequiredResponse(w, r)
+			h.responder.AuthenticationRequiredResponse(w, r)
 			return
 		}
 
 		if !slices.Contains(roles, code) {
-			h.errorResponses.NotPermittedResponse(w, r)
+			h.responder.NotPermittedResponse(w, r)
 			return
 		}
 
 		next.ServeHTTP(w, r)
 	})
 
-	return h.AuthorizationMiddleware(http.HandlerFunc(fn))
+	return h.authorizationMiddleware(http.HandlerFunc(fn))
 }
