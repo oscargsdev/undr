@@ -187,7 +187,7 @@ type authFixtureUsersRepo struct {
 
 func (r *authFixtureUsersRepo) InsertUser(*domain.User) error { panic("unexpected InsertUser call") }
 func (r *authFixtureUsersRepo) UpdateUser(*domain.User) error { panic("unexpected UpdateUser call") }
-func (r *authFixtureUsersRepo) GetForOpaqueToken(string, string) (*domain.User, error) {
+func (r *authFixtureUsersRepo) GetForOpaqueToken(domain.TokenScope, string) (*domain.User, error) {
 	panic("unexpected GetForOpaqueToken call")
 }
 func (r *authFixtureUsersRepo) GetUserByEmail(string) (*domain.User, error) {
@@ -199,7 +199,7 @@ func (r *authFixtureUsersRepo) GetUserById(int64) (*domain.User, error) {
 
 type authFixtureTokensRepo struct{}
 
-func (r *authFixtureTokensRepo) NewOpaqueToken(userID int64, ttl time.Duration, scope string) (*domain.OpaqueToken, error) {
+func (r *authFixtureTokensRepo) NewOpaqueToken(userID int64, ttl time.Duration, scope domain.TokenScope) (*domain.OpaqueToken, error) {
 	return &domain.OpaqueToken{
 		UserID:    userID,
 		Scope:     scope,
@@ -208,7 +208,7 @@ func (r *authFixtureTokensRepo) NewOpaqueToken(userID int64, ttl time.Duration, 
 	}, nil
 }
 
-func (r *authFixtureTokensRepo) DeleteAllFromUser(string, int64) error { return nil }
+func (r *authFixtureTokensRepo) DeleteAllFromUser(domain.TokenScope, int64) error { return nil }
 
 type authFixtureRolesRepo struct {
 	roles domain.Roles

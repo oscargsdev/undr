@@ -36,14 +36,14 @@ var (
 type usersRepository interface {
 	InsertUser(*domain.User) error
 	UpdateUser(*domain.User) error
-	GetForOpaqueToken(tokenScope, tokenPlaintext string) (*domain.User, error)
+	GetForOpaqueToken(tokenScope domain.TokenScope, tokenPlaintext string) (*domain.User, error)
 	GetUserByEmail(email string) (*domain.User, error)
 	GetUserById(userId int64) (*domain.User, error)
 }
 
 type opaqueTokensRepository interface {
-	NewOpaqueToken(userID int64, ttl time.Duration, scope string) (*domain.OpaqueToken, error)
-	DeleteAllFromUser(scope string, userID int64) error
+	NewOpaqueToken(userID int64, ttl time.Duration, scope domain.TokenScope) (*domain.OpaqueToken, error)
+	DeleteAllFromUser(scope domain.TokenScope, userID int64) error
 }
 
 type rolesRepository interface {

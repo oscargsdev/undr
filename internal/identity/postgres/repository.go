@@ -171,7 +171,7 @@ func (r *repository) GetUserById(userId int64) (*domain.User, error) {
 	return &user, nil
 }
 
-func generateOpaqueToken(userID int64, ttl time.Duration, scope string) *domain.OpaqueToken {
+func generateOpaqueToken(userID int64, ttl time.Duration, scope domain.TokenScope) *domain.OpaqueToken {
 	token := &domain.OpaqueToken{
 		Plaintext: rand.Text(),
 		UserID:    userID,
@@ -190,7 +190,7 @@ func (r *repository) InsertOpaqueToken(token *domain.OpaqueToken) error {
         INSERT INTO tokens (hash, user_id, expiry, scope) 
         VALUES ($1, $2, $3, $4)`
 
-	args := []any{token.Hash, token.UserID, token.Expiry, token.Scope}
+	args := []any{token.Hash, token.UserID, token.Expiry, string(token.Scope)}
 
 	ctx, cancel := context.WithTimeout(context.Background(), r.dbTimeout)
 	defer cancel()
@@ -199,14 +199,14 @@ func (r *repository) InsertOpaqueToken(token *domain.OpaqueToken) error {
 	return err
 }
 
-func (r *repository) NewOpaqueToken(userID int64, ttl time.Duration, scope string) (*domain.OpaqueToken, error) {
+func (r *repository) NewOpaqueToken(userID int64, ttl time.Duration, scope domain.TokenScope) (*domain.OpaqueToken, error) {
 	token := generateOpaqueToken(userID, ttl, scope)
 
 	err := r.InsertOpaqueToken(token)
 	return token, err
 }
 
-func (r *repository) GetForOpaqueToken(tokenScope, tokenPlaintext string) (*domain.User, error) {
+func (r *repository) GetForOpaqueToken(tokenScope domain.TokenScope, tokenPlaintext string) (*domain.User, error) {
 	tokenHash := sha256.Sum256([]byte(tokenPlaintext))
 
 	query := `
@@ -218,7 +218,7 @@ func (r *repository) GetForOpaqueToken(tokenScope, tokenPlaintext string) (*doma
         AND tokens.scope = $2 
         AND tokens.expiry > $3`
 
-	args := []any{tokenHash[:], tokenScope, time.Now()}
+	args := []any{tokenHash[:], string(tokenScope), time.Now()}
 
 	var user domain.User
 
@@ -246,7 +246,7 @@ func (r *repository) GetForOpaqueToken(tokenScope, tokenPlaintext string) (*doma
 	return &user, nil
 }
 
-func (r *repository) DeleteAllFromUser(scope string, userID int64) error {
+func (r *repository) DeleteAllFromUser(scope domain.TokenScope, userID int64) error {
 	query := `
         DELETE FROM tokens 
         WHERE scope = $1 AND user_id = $2`
@@ -254,7 +254,7 @@ func (r *repository) DeleteAllFromUser(scope string, userID int64) error {
 	ctx, cancel := context.WithTimeout(context.Background(), r.dbTimeout)
 	defer cancel()
 
-	_, err := r.db.ExecContext(ctx, query, scope, userID)
+	_, err := r.db.ExecContext(ctx, query, string(scope), userID)
 	return err
 }
 

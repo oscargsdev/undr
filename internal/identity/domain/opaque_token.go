@@ -7,9 +7,11 @@ import (
 	"github.com/oscargsdev/undr/internal/validator"
 )
 
+type TokenScope string
+
 const (
-	ScopeActivation = "activation"
-	ScopeRefresh    = "refresh"
+	ScopeActivation TokenScope = "activation"
+	ScopeRefresh    TokenScope = "refresh"
 )
 
 var (
@@ -17,11 +19,11 @@ var (
 )
 
 type OpaqueToken struct {
-	Plaintext string    `json:"token"`
-	Hash      []byte    `json:"-"`
-	UserID    int64     `json:"-"`
-	Expiry    time.Time `json:"expiry"`
-	Scope     string    `json:"-"`
+	Plaintext string     `json:"token"`
+	Hash      []byte     `json:"-"`
+	UserID    int64      `json:"-"`
+	Expiry    time.Time  `json:"expiry"`
+	Scope     TokenScope `json:"-"`
 }
 
 func ValidateOpaqueTokenPlaintext(v *validator.Validator, tokenPlaintext string) {

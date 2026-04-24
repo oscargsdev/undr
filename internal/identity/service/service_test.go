@@ -18,7 +18,7 @@ import (
 type usersRepoMock struct {
 	insertFn      func(*domain.User) error
 	updateFn      func(*domain.User) error
-	getForTokenFn func(string, string) (*domain.User, error)
+	getForTokenFn func(domain.TokenScope, string) (*domain.User, error)
 	getByEmailFn  func(string) (*domain.User, error)
 	getByIDFn     func(int64) (*domain.User, error)
 
@@ -30,7 +30,7 @@ type usersRepoMock struct {
 
 	lastInsertedUser   *domain.User
 	lastUpdatedUser    *domain.User
-	lastTokenScope     string
+	lastTokenScope     domain.TokenScope
 	lastTokenPlaintext string
 	lastEmailLookup    string
 	lastIDLookup       int64
@@ -54,7 +54,7 @@ func (m *usersRepoMock) UpdateUser(user *domain.User) error {
 	return m.updateFn(user)
 }
 
-func (m *usersRepoMock) GetForOpaqueToken(scope, plaintext string) (*domain.User, error) {
+func (m *usersRepoMock) GetForOpaqueToken(scope domain.TokenScope, plaintext string) (*domain.User, error) {
 	m.getForTokenCalls++
 	m.lastTokenScope = scope
 	m.lastTokenPlaintext = plaintext
@@ -85,20 +85,20 @@ func (m *usersRepoMock) GetUserById(userID int64) (*domain.User, error) {
 type tokenCall struct {
 	userID int64
 	ttl    time.Duration
-	scope  string
+	scope  domain.TokenScope
 }
 
 type tokensRepoMock struct {
-	newOpaqueTokenFn    func(int64, time.Duration, string) (*domain.OpaqueToken, error)
-	deleteAllFromUserFn func(string, int64) error
+	newOpaqueTokenFn    func(int64, time.Duration, domain.TokenScope) (*domain.OpaqueToken, error)
+	deleteAllFromUserFn func(domain.TokenScope, int64) error
 
 	newOpaqueTokenCalls []tokenCall
 	deleteCalls         int
-	lastDeleteScope     string
+	lastDeleteScope     domain.TokenScope
 	lastDeleteUserID    int64
 }
 
-func (m *tokensRepoMock) NewOpaqueToken(userID int64, ttl time.Duration, scope string) (*domain.OpaqueToken, error) {
+func (m *tokensRepoMock) NewOpaqueToken(userID int64, ttl time.Duration, scope domain.TokenScope) (*domain.OpaqueToken, error) {
 	m.newOpaqueTokenCalls = append(m.newOpaqueTokenCalls, tokenCall{userID: userID, ttl: ttl, scope: scope})
 	if m.newOpaqueTokenFn == nil {
 		panic("unexpected NewOpaqueToken call")
@@ -106,7 +106,7 @@ func (m *tokensRepoMock) NewOpaqueToken(userID int64, ttl time.Duration, scope s
 	return m.newOpaqueTokenFn(userID, ttl, scope)
 }
 
-func (m *tokensRepoMock) DeleteAllFromUser(scope string, userID int64) error {
+func (m *tokensRepoMock) DeleteAllFromUser(scope domain.TokenScope, userID int64) error {
 	m.deleteCalls++
 	m.lastDeleteScope = scope
 	m.lastDeleteUserID = userID
@@ -275,7 +275,7 @@ func TestIdentityService_Logout(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			tokens := &tokensRepoMock{
-				deleteAllFromUserFn: func(scope string, userID int64) error {
+				deleteAllFromUserFn: func(scope domain.TokenScope, userID int64) error {
 					return tt.repoErr
 				},
 			}
@@ -359,7 +359,7 @@ func TestIdentityService_RegisterUser(t *testing.T) {
 			roles.addRoleForUserFn = func(userID int64, codes ...string) error {
 				return tt.addRoleErr
 			}
-			tokens.newOpaqueTokenFn = func(userID int64, ttl time.Duration, scope string) (*domain.OpaqueToken, error) {
+			tokens.newOpaqueTokenFn = func(userID int64, ttl time.Duration, scope domain.TokenScope) (*domain.OpaqueToken, error) {
 				if tt.newTokenErr != nil {
 					return nil, tt.newTokenErr
 				}
@@ -483,7 +483,7 @@ func TestIdentityService_ActivateUser(t *testing.T) {
 			svc, users, tokens, roles := newTestIdentityService(t)
 			user := &domain.User{ID: 77, Activated: false, Password: domain.Password{Hash: []byte("hash")}}
 
-			users.getForTokenFn = func(scope, plaintext string) (*domain.User, error) {
+			users.getForTokenFn = func(scope domain.TokenScope, plaintext string) (*domain.User, error) {
 				if tt.getUserErr != nil {
 					return nil, tt.getUserErr
 				}
@@ -498,10 +498,10 @@ func TestIdentityService_ActivateUser(t *testing.T) {
 			users.updateFn = func(updated *domain.User) error {
 				return tt.updateErr
 			}
-			tokens.deleteAllFromUserFn = func(scope string, userID int64) error {
+			tokens.deleteAllFromUserFn = func(scope domain.TokenScope, userID int64) error {
 				return tt.deleteErr
 			}
-			tokens.newOpaqueTokenFn = func(userID int64, ttl time.Duration, scope string) (*domain.OpaqueToken, error) {
+			tokens.newOpaqueTokenFn = func(userID int64, ttl time.Duration, scope domain.TokenScope) (*domain.OpaqueToken, error) {
 				if tt.newTokenErr != nil {
 					return nil, tt.newTokenErr
 				}
@@ -670,10 +670,10 @@ func TestIdentityService_AuthenticateUser(t *testing.T) {
 				}
 				return domain.Roles{"user"}, nil
 			}
-			tokens.deleteAllFromUserFn = func(scope string, userID int64) error {
+			tokens.deleteAllFromUserFn = func(scope domain.TokenScope, userID int64) error {
 				return tt.deleteErr
 			}
-			tokens.newOpaqueTokenFn = func(userID int64, ttl time.Duration, scope string) (*domain.OpaqueToken, error) {
+			tokens.newOpaqueTokenFn = func(userID int64, ttl time.Duration, scope domain.TokenScope) (*domain.OpaqueToken, error) {
 				if tt.newTokenErr != nil {
 					return nil, tt.newTokenErr
 				}
@@ -786,7 +786,7 @@ func TestIdentityService_RefreshToken(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			svc, users, tokens, roles := newTestIdentityService(t)
-			users.getForTokenFn = func(scope, plaintext string) (*domain.User, error) {
+			users.getForTokenFn = func(scope domain.TokenScope, plaintext string) (*domain.User, error) {
 				if tt.getUserErr != nil {
 					return nil, tt.getUserErr
 				}
@@ -798,10 +798,10 @@ func TestIdentityService_RefreshToken(t *testing.T) {
 				}
 				return domain.Roles{"user"}, nil
 			}
-			tokens.deleteAllFromUserFn = func(scope string, userID int64) error {
+			tokens.deleteAllFromUserFn = func(scope domain.TokenScope, userID int64) error {
 				return tt.deleteErr
 			}
-			tokens.newOpaqueTokenFn = func(userID int64, ttl time.Duration, scope string) (*domain.OpaqueToken, error) {
+			tokens.newOpaqueTokenFn = func(userID int64, ttl time.Duration, scope domain.TokenScope) (*domain.OpaqueToken, error) {
 				if tt.newTokenErr != nil {
 					return nil, tt.newTokenErr
 				}
