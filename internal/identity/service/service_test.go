@@ -12,7 +12,7 @@ import (
 
 	"github.com/golang-jwt/jwt/v5"
 	"github.com/oscargsdev/undr/internal/identity/domain"
-	"github.com/oscargsdev/undr/internal/identity/postgres"
+	"github.com/oscargsdev/undr/internal/identity/store"
 )
 
 type usersRepoMock struct {
@@ -54,12 +54,12 @@ func (m *usersRepoMock) UpdateUser(user *domain.User) error {
 	return m.updateFn(user)
 }
 
-func (m *usersRepoMock) GetForOpaqueToken(scope domain.TokenScope, plaintext string) (*domain.User, error) {
+func (m *usersRepoMock) GetUserForOpaqueToken(scope domain.TokenScope, plaintext string) (*domain.User, error) {
 	m.getForTokenCalls++
 	m.lastTokenScope = scope
 	m.lastTokenPlaintext = plaintext
 	if m.getForTokenFn == nil {
-		panic("unexpected GetForOpaqueToken call")
+		panic("unexpected GetUserForOpaqueToken call")
 	}
 	return m.getForTokenFn(scope, plaintext)
 }
@@ -199,10 +199,10 @@ func TestMapRepositoryError(t *testing.T) {
 		in   error
 		want error
 	}{
-		{name: "duplicate email", in: postgres.ErrDuplicateEmail, want: ErrDuplicateEmail},
-		{name: "wrapped duplicate username", in: errors.Join(errors.New("wrapped"), postgres.ErrDuplicateUsername), want: ErrDuplicateUsername},
-		{name: "record not found", in: postgres.ErrRecordNotFound, want: ErrRecordNotFound},
-		{name: "edit conflict", in: postgres.ErrEditConflict, want: ErrEditConflict},
+		{name: "duplicate email", in: store.ErrDuplicateEmail, want: ErrDuplicateEmail},
+		{name: "wrapped duplicate username", in: errors.Join(errors.New("wrapped"), store.ErrDuplicateUsername), want: ErrDuplicateUsername},
+		{name: "record not found", in: store.ErrRecordNotFound, want: ErrRecordNotFound},
+		{name: "edit conflict", in: store.ErrEditConflict, want: ErrEditConflict},
 		{name: "unknown passthrough", in: unknownErr, want: unknownErr},
 	}
 
@@ -268,7 +268,7 @@ func TestIdentityService_Logout(t *testing.T) {
 		wantSameErr bool
 	}{
 		{name: "success", repoErr: nil, wantErr: nil},
-		{name: "mapped record not found", repoErr: postgres.ErrRecordNotFound, wantErr: ErrRecordNotFound},
+		{name: "mapped record not found", repoErr: store.ErrRecordNotFound, wantErr: ErrRecordNotFound},
 		{name: "unknown passthrough", repoErr: unknownErr, wantErr: unknownErr, wantSameErr: true},
 	}
 
@@ -324,20 +324,20 @@ func TestIdentityService_RegisterUser(t *testing.T) {
 		},
 		{
 			name:            "insert error mapped",
-			insertErr:       postgres.ErrDuplicateEmail,
+			insertErr:       store.ErrDuplicateEmail,
 			wantErr:         ErrDuplicateEmail,
 			wantInsertCalls: 1,
 		},
 		{
 			name:             "add role error mapped",
-			addRoleErr:       postgres.ErrDuplicateUsername,
+			addRoleErr:       store.ErrDuplicateUsername,
 			wantErr:          ErrDuplicateUsername,
 			wantInsertCalls:  1,
 			wantAddRoleCalls: 1,
 		},
 		{
 			name:              "new token error mapped",
-			newTokenErr:       postgres.ErrRecordNotFound,
+			newTokenErr:       store.ErrRecordNotFound,
 			wantErr:           ErrRecordNotFound,
 			wantInsertCalls:   1,
 			wantAddRoleCalls:  1,
@@ -438,20 +438,20 @@ func TestIdentityService_ActivateUser(t *testing.T) {
 		},
 		{
 			name:             "get user error mapped",
-			getUserErr:       postgres.ErrRecordNotFound,
+			getUserErr:       store.ErrRecordNotFound,
 			wantErr:          ErrRecordNotFound,
 			wantGetUserCalls: 1,
 		},
 		{
 			name:              "get roles error mapped",
-			getRolesErr:       postgres.ErrRecordNotFound,
+			getRolesErr:       store.ErrRecordNotFound,
 			wantErr:           ErrRecordNotFound,
 			wantGetUserCalls:  1,
 			wantGetRolesCalls: 1,
 		},
 		{
 			name:              "update error mapped",
-			updateErr:         postgres.ErrEditConflict,
+			updateErr:         store.ErrEditConflict,
 			wantErr:           ErrEditConflict,
 			wantGetUserCalls:  1,
 			wantGetRolesCalls: 1,
@@ -459,7 +459,7 @@ func TestIdentityService_ActivateUser(t *testing.T) {
 		},
 		{
 			name:              "delete activation tokens error mapped",
-			deleteErr:         postgres.ErrRecordNotFound,
+			deleteErr:         store.ErrRecordNotFound,
 			wantErr:           ErrRecordNotFound,
 			wantGetUserCalls:  1,
 			wantGetRolesCalls: 1,
@@ -468,7 +468,7 @@ func TestIdentityService_ActivateUser(t *testing.T) {
 		},
 		{
 			name:              "new refresh token error mapped",
-			newTokenErr:       postgres.ErrRecordNotFound,
+			newTokenErr:       store.ErrRecordNotFound,
 			wantErr:           ErrRecordNotFound,
 			wantGetUserCalls:  1,
 			wantGetRolesCalls: 1,
@@ -521,7 +521,7 @@ func TestIdentityService_ActivateUser(t *testing.T) {
 			}
 
 			if users.getForTokenCalls != tt.wantGetUserCalls {
-				t.Fatalf("expected GetForOpaqueToken calls %d, got %d", tt.wantGetUserCalls, users.getForTokenCalls)
+				t.Fatalf("expected GetUserForOpaqueToken calls %d, got %d", tt.wantGetUserCalls, users.getForTokenCalls)
 			}
 			if roles.getAllCalls != tt.wantGetRolesCalls {
 				t.Fatalf("expected GetAllRolesForUser calls %d, got %d", tt.wantGetRolesCalls, roles.getAllCalls)
@@ -594,7 +594,7 @@ func TestIdentityService_AuthenticateUser(t *testing.T) {
 			name:             "get user error mapped",
 			user:             validUser,
 			password:         "correct-password",
-			getUserErr:       postgres.ErrRecordNotFound,
+			getUserErr:       store.ErrRecordNotFound,
 			wantErr:          ErrRecordNotFound,
 			wantGetUserCalls: 1,
 		},
@@ -602,7 +602,7 @@ func TestIdentityService_AuthenticateUser(t *testing.T) {
 			name:              "get roles error mapped",
 			user:              validUser,
 			password:          "correct-password",
-			getRolesErr:       postgres.ErrRecordNotFound,
+			getRolesErr:       store.ErrRecordNotFound,
 			wantErr:           ErrRecordNotFound,
 			wantGetUserCalls:  1,
 			wantGetRolesCalls: 1,
@@ -635,7 +635,7 @@ func TestIdentityService_AuthenticateUser(t *testing.T) {
 			name:              "delete refresh tokens error mapped",
 			user:              validUser,
 			password:          "correct-password",
-			deleteErr:         postgres.ErrRecordNotFound,
+			deleteErr:         store.ErrRecordNotFound,
 			wantErr:           ErrRecordNotFound,
 			wantGetUserCalls:  1,
 			wantGetRolesCalls: 1,
@@ -645,7 +645,7 @@ func TestIdentityService_AuthenticateUser(t *testing.T) {
 			name:              "new refresh token error mapped",
 			user:              validUser,
 			password:          "correct-password",
-			newTokenErr:       postgres.ErrRecordNotFound,
+			newTokenErr:       store.ErrRecordNotFound,
 			wantErr:           ErrRecordNotFound,
 			wantGetUserCalls:  1,
 			wantGetRolesCalls: 1,
@@ -753,20 +753,20 @@ func TestIdentityService_RefreshToken(t *testing.T) {
 		},
 		{
 			name:             "get user error mapped",
-			getUserErr:       postgres.ErrRecordNotFound,
+			getUserErr:       store.ErrRecordNotFound,
 			wantErr:          ErrRecordNotFound,
 			wantGetUserCalls: 1,
 		},
 		{
 			name:              "get roles error mapped",
-			getRolesErr:       postgres.ErrRecordNotFound,
+			getRolesErr:       store.ErrRecordNotFound,
 			wantErr:           ErrRecordNotFound,
 			wantGetUserCalls:  1,
 			wantGetRolesCalls: 1,
 		},
 		{
 			name:              "delete error mapped",
-			deleteErr:         postgres.ErrRecordNotFound,
+			deleteErr:         store.ErrRecordNotFound,
 			wantErr:           ErrRecordNotFound,
 			wantGetUserCalls:  1,
 			wantGetRolesCalls: 1,
@@ -774,7 +774,7 @@ func TestIdentityService_RefreshToken(t *testing.T) {
 		},
 		{
 			name:              "new token error mapped",
-			newTokenErr:       postgres.ErrRecordNotFound,
+			newTokenErr:       store.ErrRecordNotFound,
 			wantErr:           ErrRecordNotFound,
 			wantGetUserCalls:  1,
 			wantGetRolesCalls: 1,
@@ -821,7 +821,7 @@ func TestIdentityService_RefreshToken(t *testing.T) {
 			}
 
 			if users.getForTokenCalls != tt.wantGetUserCalls {
-				t.Fatalf("expected GetForOpaqueToken calls %d, got %d", tt.wantGetUserCalls, users.getForTokenCalls)
+				t.Fatalf("expected GetUserForOpaqueToken calls %d, got %d", tt.wantGetUserCalls, users.getForTokenCalls)
 			}
 			if roles.getAllCalls != tt.wantGetRolesCalls {
 				t.Fatalf("expected GetAllRolesForUser calls %d, got %d", tt.wantGetRolesCalls, roles.getAllCalls)
@@ -861,7 +861,7 @@ func TestIdentityService_GetUserByID(t *testing.T) {
 		},
 		{
 			name:             "get user error mapped",
-			getUserErr:       postgres.ErrRecordNotFound,
+			getUserErr:       store.ErrRecordNotFound,
 			wantErr:          ErrRecordNotFound,
 			wantGetUserCalls: 1,
 		},

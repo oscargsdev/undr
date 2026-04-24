@@ -48,7 +48,7 @@ type FlagConfig struct {
 func New(cfg Config) (*Module, error) {
 	module := &Module{}
 
-	repo := postgres.NewRepository(cfg.DB, cfg.DBTimeout, cfg.Logger)
+	repo := postgres.NewRepository(cfg.DB, cfg.DBTimeout)
 
 	svcConfig := service.Config{
 		UsersRepository:        repo,

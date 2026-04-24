@@ -187,8 +187,8 @@ type authFixtureUsersRepo struct {
 
 func (r *authFixtureUsersRepo) InsertUser(*domain.User) error { panic("unexpected InsertUser call") }
 func (r *authFixtureUsersRepo) UpdateUser(*domain.User) error { panic("unexpected UpdateUser call") }
-func (r *authFixtureUsersRepo) GetForOpaqueToken(domain.TokenScope, string) (*domain.User, error) {
-	panic("unexpected GetForOpaqueToken call")
+func (r *authFixtureUsersRepo) GetUserForOpaqueToken(domain.TokenScope, string) (*domain.User, error) {
+	panic("unexpected GetUserForOpaqueToken call")
 }
 func (r *authFixtureUsersRepo) GetUserByEmail(string) (*domain.User, error) {
 	return r.user, nil

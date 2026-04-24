@@ -14,7 +14,7 @@ import (
 	"github.com/MicahParks/jwkset"
 	"github.com/golang-jwt/jwt/v5"
 	"github.com/oscargsdev/undr/internal/identity/domain"
-	"github.com/oscargsdev/undr/internal/identity/postgres"
+	"github.com/oscargsdev/undr/internal/identity/store"
 )
 
 const userIdContextKey = contextKey("userId")
@@ -36,7 +36,7 @@ var (
 type usersRepository interface {
 	InsertUser(*domain.User) error
 	UpdateUser(*domain.User) error
-	GetForOpaqueToken(tokenScope domain.TokenScope, tokenPlaintext string) (*domain.User, error)
+	GetUserForOpaqueToken(tokenScope domain.TokenScope, tokenPlaintext string) (*domain.User, error)
 	GetUserByEmail(email string) (*domain.User, error)
 	GetUserById(userId int64) (*domain.User, error)
 }
@@ -77,13 +77,13 @@ type identityService struct {
 
 func mapRepositoryError(err error) error {
 	switch {
-	case errors.Is(err, postgres.ErrDuplicateEmail):
+	case errors.Is(err, store.ErrDuplicateEmail):
 		return ErrDuplicateEmail
-	case errors.Is(err, postgres.ErrDuplicateUsername):
+	case errors.Is(err, store.ErrDuplicateUsername):
 		return ErrDuplicateUsername
-	case errors.Is(err, postgres.ErrRecordNotFound):
+	case errors.Is(err, store.ErrRecordNotFound):
 		return ErrRecordNotFound
-	case errors.Is(err, postgres.ErrEditConflict):
+	case errors.Is(err, store.ErrEditConflict):
 		return ErrEditConflict
 	default:
 		return err
@@ -127,7 +127,7 @@ func (s *identityService) RegisterUser(user *domain.User) (*domain.OpaqueToken, 
 }
 
 func (s *identityService) ActivateUser(tokenPlainText string) (refreshTokenString string, accessTokenString string, err error) {
-	user, err := s.cfg.UsersRepository.GetForOpaqueToken(domain.ScopeActivation, tokenPlainText)
+	user, err := s.cfg.UsersRepository.GetUserForOpaqueToken(domain.ScopeActivation, tokenPlainText)
 	if err != nil {
 		return "", "", mapRepositoryError(err)
 	}
@@ -209,7 +209,7 @@ func (s *identityService) AuthenticateUser(email, password string) (refreshToken
 }
 
 func (s *identityService) RefreshToken(oldRefreshToken string) (refreshTokenString string, accessTokenString string, err error) {
-	user, err := s.cfg.UsersRepository.GetForOpaqueToken(domain.ScopeRefresh, oldRefreshToken)
+	user, err := s.cfg.UsersRepository.GetUserForOpaqueToken(domain.ScopeRefresh, oldRefreshToken)
 	if err != nil {
 		return "", "", mapRepositoryError(err)
 	}
