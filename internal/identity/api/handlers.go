@@ -1,6 +1,7 @@
 package api
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"log/slog"
@@ -18,12 +19,12 @@ import (
 )
 
 type IdentityService interface {
-	RegisterUser(user *domain.User) (*domain.OpaqueToken, error)
-	ActivateUser(tokenPlainText string) (refreshTokenString string, accessTokenString string, err error)
-	AuthenticateUser(email, password string) (refreshTokenString string, accessTokenString string, err error)
-	GetUserById(userId int64) (*domain.UserDetails, error)
-	RefreshToken(oldRefreshToken string) (refreshTokenString string, accessTokenString string, err error)
-	Logout(userId int64) error
+	RegisterUser(context.Context, *domain.User) (*domain.OpaqueToken, error)
+	ActivateUser(context.Context, string) (refreshTokenString string, accessTokenString string, err error)
+	AuthenticateUser(context.Context, string, string) (refreshTokenString string, accessTokenString string, err error)
+	GetUserById(context.Context, int64) (*domain.UserDetails, error)
+	RefreshToken(context.Context, string) (refreshTokenString string, accessTokenString string, err error)
+	Logout(context.Context, int64) error
 	GetIssuer() string
 	GetJWKS(r *http.Request) (json.RawMessage, error)
 	ValidateJWTToken(tokenString string, issuer string) (*jwt.Token, error)
@@ -92,7 +93,7 @@ func (h *handler) registerUserHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	activationToken, err := h.service.RegisterUser(user)
+	activationToken, err := h.service.RegisterUser(r.Context(), user)
 	if err != nil {
 		switch {
 		case errors.Is(err, service.ErrDuplicateEmail):
@@ -133,7 +134,7 @@ func (h *handler) activateUserHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	refreshToken, accessToken, err := h.service.ActivateUser(input.TokenPlainText)
+	refreshToken, accessToken, err := h.service.ActivateUser(r.Context(), input.TokenPlainText)
 	if err != nil {
 		switch {
 		case errors.Is(err, service.ErrRecordNotFound):
@@ -199,7 +200,7 @@ func (h *handler) authenticateUserHandler(w http.ResponseWriter, r *http.Request
 		return
 	}
 
-	refreshToken, accessToken, err := h.service.AuthenticateUser(input.Email, input.Password)
+	refreshToken, accessToken, err := h.service.AuthenticateUser(r.Context(), input.Email, input.Password)
 	if err != nil {
 		switch {
 		case errors.Is(err, service.ErrRecordNotFound):
@@ -240,7 +241,7 @@ func (h *handler) refreshTokenHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	refreshToken, accessToken, err := h.service.RefreshToken(oldToken)
+	refreshToken, accessToken, err := h.service.RefreshToken(r.Context(), oldToken)
 	if err != nil {
 		switch {
 		case errors.Is(err, service.ErrRecordNotFound):
@@ -268,7 +269,7 @@ func (h *handler) logoutHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	err = h.service.Logout(userId)
+	err = h.service.Logout(r.Context(), userId)
 	if err != nil {
 		h.logError(r, err)
 		h.responder.ServerErrorResponse(w, r, err)
@@ -306,7 +307,7 @@ func (h *handler) myInfoHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	user, err := h.service.GetUserById(contextUserId)
+	user, err := h.service.GetUserById(r.Context(), contextUserId)
 	if err != nil {
 		switch {
 		case errors.Is(err, service.ErrRecordNotFound):

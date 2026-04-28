@@ -16,11 +16,11 @@ import (
 )
 
 type usersRepoMock struct {
-	insertFn      func(*domain.User) error
-	updateFn      func(*domain.User) error
-	getForTokenFn func(domain.TokenScope, string) (*domain.User, error)
-	getByEmailFn  func(string) (*domain.User, error)
-	getByIDFn     func(int64) (*domain.User, error)
+	insertFn      func(context.Context, *domain.User) error
+	updateFn      func(context.Context, *domain.User) error
+	getForTokenFn func(context.Context, domain.TokenScope, string) (*domain.User, error)
+	getByEmailFn  func(context.Context, string) (*domain.User, error)
+	getByIDFn     func(context.Context, int64) (*domain.User, error)
 
 	insertCalls      int
 	updateCalls      int
@@ -30,56 +30,62 @@ type usersRepoMock struct {
 
 	lastInsertedUser   *domain.User
 	lastUpdatedUser    *domain.User
+	lastContext        context.Context
 	lastTokenScope     domain.TokenScope
 	lastTokenPlaintext string
 	lastEmailLookup    string
 	lastIDLookup       int64
 }
 
-func (m *usersRepoMock) InsertUser(user *domain.User) error {
+func (m *usersRepoMock) InsertUser(ctx context.Context, user *domain.User) error {
 	m.insertCalls++
+	m.lastContext = ctx
 	m.lastInsertedUser = user
 	if m.insertFn == nil {
 		panic("unexpected InsertUser call")
 	}
-	return m.insertFn(user)
+	return m.insertFn(ctx, user)
 }
 
-func (m *usersRepoMock) UpdateUser(user *domain.User) error {
+func (m *usersRepoMock) UpdateUser(ctx context.Context, user *domain.User) error {
 	m.updateCalls++
+	m.lastContext = ctx
 	m.lastUpdatedUser = user
 	if m.updateFn == nil {
 		panic("unexpected UpdateUser call")
 	}
-	return m.updateFn(user)
+	return m.updateFn(ctx, user)
 }
 
-func (m *usersRepoMock) GetUserForOpaqueToken(scope domain.TokenScope, plaintext string) (*domain.User, error) {
+func (m *usersRepoMock) GetUserForOpaqueToken(ctx context.Context, scope domain.TokenScope, plaintext string) (*domain.User, error) {
 	m.getForTokenCalls++
+	m.lastContext = ctx
 	m.lastTokenScope = scope
 	m.lastTokenPlaintext = plaintext
 	if m.getForTokenFn == nil {
 		panic("unexpected GetUserForOpaqueToken call")
 	}
-	return m.getForTokenFn(scope, plaintext)
+	return m.getForTokenFn(ctx, scope, plaintext)
 }
 
-func (m *usersRepoMock) GetUserByEmail(email string) (*domain.User, error) {
+func (m *usersRepoMock) GetUserByEmail(ctx context.Context, email string) (*domain.User, error) {
 	m.getByEmailCalls++
+	m.lastContext = ctx
 	m.lastEmailLookup = email
 	if m.getByEmailFn == nil {
 		panic("unexpected GetUserByEmail call")
 	}
-	return m.getByEmailFn(email)
+	return m.getByEmailFn(ctx, email)
 }
 
-func (m *usersRepoMock) GetUserById(userID int64) (*domain.User, error) {
+func (m *usersRepoMock) GetUserById(ctx context.Context, userID int64) (*domain.User, error) {
 	m.getByIDCalls++
+	m.lastContext = ctx
 	m.lastIDLookup = userID
 	if m.getByIDFn == nil {
 		panic("unexpected GetUserById call")
 	}
-	return m.getByIDFn(userID)
+	return m.getByIDFn(ctx, userID)
 }
 
 type tokenCall struct {
@@ -89,62 +95,68 @@ type tokenCall struct {
 }
 
 type tokensRepoMock struct {
-	newOpaqueTokenFn    func(int64, time.Duration, domain.TokenScope) (*domain.OpaqueToken, error)
-	deleteAllFromUserFn func(domain.TokenScope, int64) error
+	newOpaqueTokenFn    func(context.Context, int64, time.Duration, domain.TokenScope) (*domain.OpaqueToken, error)
+	deleteAllFromUserFn func(context.Context, domain.TokenScope, int64) error
 
 	newOpaqueTokenCalls []tokenCall
 	deleteCalls         int
+	lastContext         context.Context
 	lastDeleteScope     domain.TokenScope
 	lastDeleteUserID    int64
 }
 
-func (m *tokensRepoMock) NewOpaqueToken(userID int64, ttl time.Duration, scope domain.TokenScope) (*domain.OpaqueToken, error) {
+func (m *tokensRepoMock) NewOpaqueToken(ctx context.Context, userID int64, ttl time.Duration, scope domain.TokenScope) (*domain.OpaqueToken, error) {
 	m.newOpaqueTokenCalls = append(m.newOpaqueTokenCalls, tokenCall{userID: userID, ttl: ttl, scope: scope})
+	m.lastContext = ctx
 	if m.newOpaqueTokenFn == nil {
 		panic("unexpected NewOpaqueToken call")
 	}
-	return m.newOpaqueTokenFn(userID, ttl, scope)
+	return m.newOpaqueTokenFn(ctx, userID, ttl, scope)
 }
 
-func (m *tokensRepoMock) DeleteAllFromUser(scope domain.TokenScope, userID int64) error {
+func (m *tokensRepoMock) DeleteAllFromUser(ctx context.Context, scope domain.TokenScope, userID int64) error {
 	m.deleteCalls++
+	m.lastContext = ctx
 	m.lastDeleteScope = scope
 	m.lastDeleteUserID = userID
 	if m.deleteAllFromUserFn == nil {
 		panic("unexpected DeleteAllFromUser call")
 	}
-	return m.deleteAllFromUserFn(scope, userID)
+	return m.deleteAllFromUserFn(ctx, scope, userID)
 }
 
 type rolesRepoMock struct {
-	getAllForUserFn  func(int64) (domain.Roles, error)
-	addRoleForUserFn func(int64, ...string) error
+	getAllForUserFn  func(context.Context, int64) (domain.Roles, error)
+	addRoleForUserFn func(context.Context, int64, ...string) error
 
 	getAllCalls  int
 	addRoleCalls int
 
+	lastContext      context.Context
 	lastGetAllUserID int64
 	lastAddUserID    int64
 	lastAddCodes     []string
 }
 
-func (m *rolesRepoMock) GetAllRolesForUser(userID int64) (domain.Roles, error) {
+func (m *rolesRepoMock) GetAllRolesForUser(ctx context.Context, userID int64) (domain.Roles, error) {
 	m.getAllCalls++
+	m.lastContext = ctx
 	m.lastGetAllUserID = userID
 	if m.getAllForUserFn == nil {
 		panic("unexpected GetAllRolesForUser call")
 	}
-	return m.getAllForUserFn(userID)
+	return m.getAllForUserFn(ctx, userID)
 }
 
-func (m *rolesRepoMock) AddRoleForUser(userID int64, codes ...string) error {
+func (m *rolesRepoMock) AddRoleForUser(ctx context.Context, userID int64, codes ...string) error {
 	m.addRoleCalls++
+	m.lastContext = ctx
 	m.lastAddUserID = userID
 	m.lastAddCodes = append([]string(nil), codes...)
 	if m.addRoleForUserFn == nil {
 		panic("unexpected AddRoleForUser call")
 	}
-	return m.addRoleForUserFn(userID, codes...)
+	return m.addRoleForUserFn(ctx, userID, codes...)
 }
 
 func newTestIdentityService(t *testing.T) (*identityService, *usersRepoMock, *tokensRepoMock, *rolesRepoMock) {
@@ -275,13 +287,13 @@ func TestIdentityService_Logout(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			tokens := &tokensRepoMock{
-				deleteAllFromUserFn: func(scope domain.TokenScope, userID int64) error {
+				deleteAllFromUserFn: func(ctx context.Context, scope domain.TokenScope, userID int64) error {
 					return tt.repoErr
 				},
 			}
 			svc := &identityService{cfg: Config{OpaqueTokensRepository: tokens}}
 
-			err := svc.Logout(42)
+			err := svc.Logout(context.Background(), 42)
 			if tt.wantSameErr {
 				if err != tt.wantErr {
 					t.Fatalf("expected passthrough error identity")
@@ -349,17 +361,17 @@ func TestIdentityService_RegisterUser(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			svc, users, tokens, roles := newTestIdentityService(t)
 
-			users.insertFn = func(user *domain.User) error {
+			users.insertFn = func(ctx context.Context, user *domain.User) error {
 				if tt.insertErr != nil {
 					return tt.insertErr
 				}
 				user.ID = 99
 				return nil
 			}
-			roles.addRoleForUserFn = func(userID int64, codes ...string) error {
+			roles.addRoleForUserFn = func(ctx context.Context, userID int64, codes ...string) error {
 				return tt.addRoleErr
 			}
-			tokens.newOpaqueTokenFn = func(userID int64, ttl time.Duration, scope domain.TokenScope) (*domain.OpaqueToken, error) {
+			tokens.newOpaqueTokenFn = func(ctx context.Context, userID int64, ttl time.Duration, scope domain.TokenScope) (*domain.OpaqueToken, error) {
 				if tt.newTokenErr != nil {
 					return nil, tt.newTokenErr
 				}
@@ -367,7 +379,7 @@ func TestIdentityService_RegisterUser(t *testing.T) {
 			}
 
 			user := &domain.User{Username: "alice", Email: "alice@example.com", Password: domain.Password{Hash: []byte("hash")}}
-			activationToken, err := svc.RegisterUser(user)
+			activationToken, err := svc.RegisterUser(context.Background(), user)
 
 			assertError(t, err, tt.wantErr)
 			if tt.wantErr != nil {
@@ -406,6 +418,37 @@ func TestIdentityService_RegisterUser(t *testing.T) {
 				}
 			}
 		})
+	}
+}
+
+func TestIdentityService_RegisterUserPassesContextToRepositories(t *testing.T) {
+	svc, users, tokens, roles := newTestIdentityService(t)
+	ctx := context.WithValue(context.Background(), contextKey("test-context"), "request")
+
+	users.insertFn = func(ctx context.Context, user *domain.User) error {
+		user.ID = 99
+		return nil
+	}
+	roles.addRoleForUserFn = func(ctx context.Context, userID int64, codes ...string) error {
+		return nil
+	}
+	tokens.newOpaqueTokenFn = func(ctx context.Context, userID int64, ttl time.Duration, scope domain.TokenScope) (*domain.OpaqueToken, error) {
+		return &domain.OpaqueToken{Plaintext: "activation-token"}, nil
+	}
+
+	user := &domain.User{Username: "alice", Email: "alice@example.com", Password: domain.Password{Hash: []byte("hash")}}
+	if _, err := svc.RegisterUser(ctx, user); err != nil {
+		t.Fatalf("expected nil error, got %v", err)
+	}
+
+	if users.lastContext != ctx {
+		t.Fatal("expected users repository to receive request context")
+	}
+	if roles.lastContext != ctx {
+		t.Fatal("expected roles repository to receive request context")
+	}
+	if tokens.lastContext != ctx {
+		t.Fatal("expected tokens repository to receive request context")
 	}
 }
 
@@ -483,31 +526,31 @@ func TestIdentityService_ActivateUser(t *testing.T) {
 			svc, users, tokens, roles := newTestIdentityService(t)
 			user := &domain.User{ID: 77, Activated: false, Password: domain.Password{Hash: []byte("hash")}}
 
-			users.getForTokenFn = func(scope domain.TokenScope, plaintext string) (*domain.User, error) {
+			users.getForTokenFn = func(ctx context.Context, scope domain.TokenScope, plaintext string) (*domain.User, error) {
 				if tt.getUserErr != nil {
 					return nil, tt.getUserErr
 				}
 				return user, nil
 			}
-			roles.getAllForUserFn = func(userID int64) (domain.Roles, error) {
+			roles.getAllForUserFn = func(ctx context.Context, userID int64) (domain.Roles, error) {
 				if tt.getRolesErr != nil {
 					return nil, tt.getRolesErr
 				}
 				return domain.Roles{"user", "admin"}, nil
 			}
-			users.updateFn = func(updated *domain.User) error {
+			users.updateFn = func(ctx context.Context, updated *domain.User) error {
 				return tt.updateErr
 			}
-			tokens.deleteAllFromUserFn = func(scope domain.TokenScope, userID int64) error {
+			tokens.deleteAllFromUserFn = func(ctx context.Context, scope domain.TokenScope, userID int64) error {
 				return tt.deleteErr
 			}
-			tokens.newOpaqueTokenFn = func(userID int64, ttl time.Duration, scope domain.TokenScope) (*domain.OpaqueToken, error) {
+			tokens.newOpaqueTokenFn = func(ctx context.Context, userID int64, ttl time.Duration, scope domain.TokenScope) (*domain.OpaqueToken, error) {
 				if tt.newTokenErr != nil {
 					return nil, tt.newTokenErr
 				}
 				return &domain.OpaqueToken{Plaintext: "refresh-token"}, nil
 			}
-			refreshToken, accessToken, err := svc.ActivateUser("activation-plaintext")
+			refreshToken, accessToken, err := svc.ActivateUser(context.Background(), "activation-plaintext")
 			assertError(t, err, tt.wantErr)
 
 			if refreshToken != tt.wantRefreshToken {
@@ -658,28 +701,28 @@ func TestIdentityService_AuthenticateUser(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			svc, users, tokens, roles := newTestIdentityService(t)
 
-			users.getByEmailFn = func(email string) (*domain.User, error) {
+			users.getByEmailFn = func(ctx context.Context, email string) (*domain.User, error) {
 				if tt.getUserErr != nil {
 					return nil, tt.getUserErr
 				}
 				return tt.user, nil
 			}
-			roles.getAllForUserFn = func(userID int64) (domain.Roles, error) {
+			roles.getAllForUserFn = func(ctx context.Context, userID int64) (domain.Roles, error) {
 				if tt.getRolesErr != nil {
 					return nil, tt.getRolesErr
 				}
 				return domain.Roles{"user"}, nil
 			}
-			tokens.deleteAllFromUserFn = func(scope domain.TokenScope, userID int64) error {
+			tokens.deleteAllFromUserFn = func(ctx context.Context, scope domain.TokenScope, userID int64) error {
 				return tt.deleteErr
 			}
-			tokens.newOpaqueTokenFn = func(userID int64, ttl time.Duration, scope domain.TokenScope) (*domain.OpaqueToken, error) {
+			tokens.newOpaqueTokenFn = func(ctx context.Context, userID int64, ttl time.Duration, scope domain.TokenScope) (*domain.OpaqueToken, error) {
 				if tt.newTokenErr != nil {
 					return nil, tt.newTokenErr
 				}
 				return &domain.OpaqueToken{Plaintext: "new-refresh-token"}, nil
 			}
-			refreshToken, accessToken, err := svc.AuthenticateUser("alice@example.com", tt.password)
+			refreshToken, accessToken, err := svc.AuthenticateUser(context.Background(), "alice@example.com", tt.password)
 
 			if tt.wantRawHashError {
 				if err == nil {
@@ -786,28 +829,28 @@ func TestIdentityService_RefreshToken(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			svc, users, tokens, roles := newTestIdentityService(t)
-			users.getForTokenFn = func(scope domain.TokenScope, plaintext string) (*domain.User, error) {
+			users.getForTokenFn = func(ctx context.Context, scope domain.TokenScope, plaintext string) (*domain.User, error) {
 				if tt.getUserErr != nil {
 					return nil, tt.getUserErr
 				}
 				return &domain.User{ID: 88, Password: domain.Password{Hash: []byte("hash")}}, nil
 			}
-			roles.getAllForUserFn = func(userID int64) (domain.Roles, error) {
+			roles.getAllForUserFn = func(ctx context.Context, userID int64) (domain.Roles, error) {
 				if tt.getRolesErr != nil {
 					return nil, tt.getRolesErr
 				}
 				return domain.Roles{"user"}, nil
 			}
-			tokens.deleteAllFromUserFn = func(scope domain.TokenScope, userID int64) error {
+			tokens.deleteAllFromUserFn = func(ctx context.Context, scope domain.TokenScope, userID int64) error {
 				return tt.deleteErr
 			}
-			tokens.newOpaqueTokenFn = func(userID int64, ttl time.Duration, scope domain.TokenScope) (*domain.OpaqueToken, error) {
+			tokens.newOpaqueTokenFn = func(ctx context.Context, userID int64, ttl time.Duration, scope domain.TokenScope) (*domain.OpaqueToken, error) {
 				if tt.newTokenErr != nil {
 					return nil, tt.newTokenErr
 				}
 				return &domain.OpaqueToken{Plaintext: "rotated-refresh-token"}, nil
 			}
-			refreshToken, accessToken, err := svc.RefreshToken("old-refresh-token")
+			refreshToken, accessToken, err := svc.RefreshToken(context.Background(), "old-refresh-token")
 			assertError(t, err, tt.wantErr)
 
 			if refreshToken != tt.wantRefreshToken {
@@ -878,20 +921,20 @@ func TestIdentityService_GetUserByID(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			svc, users, _, roles := newTestIdentityService(t)
 
-			users.getByIDFn = func(userID int64) (*domain.User, error) {
+			users.getByIDFn = func(ctx context.Context, userID int64) (*domain.User, error) {
 				if tt.getUserErr != nil {
 					return nil, tt.getUserErr
 				}
 				return &domain.User{ID: userID, Email: "alice@example.com", Username: "alice", Password: domain.Password{Hash: []byte("hash")}}, nil
 			}
-			roles.getAllForUserFn = func(userID int64) (domain.Roles, error) {
+			roles.getAllForUserFn = func(ctx context.Context, userID int64) (domain.Roles, error) {
 				if tt.getRolesErr != nil {
 					return nil, tt.getRolesErr
 				}
 				return domain.Roles{"user", "admin"}, nil
 			}
 
-			userDetails, err := svc.GetUserById(21)
+			userDetails, err := svc.GetUserById(context.Background(), 21)
 			assertError(t, err, tt.wantErr)
 			if tt.wantErr != nil {
 				if userDetails != nil {

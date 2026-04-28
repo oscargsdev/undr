@@ -1,6 +1,7 @@
 package api
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -17,12 +18,12 @@ import (
 )
 
 type mockIdentityService struct {
-	registerUserFn     func(user *domain.User) (*domain.OpaqueToken, error)
-	activateUserFn     func(tokenPlainText string) (string, string, error)
-	authenticateUserFn func(email, password string) (string, string, error)
-	getUserByIDFn      func(userID int64) (*domain.UserDetails, error)
-	refreshTokenFn     func(oldRefreshToken string) (string, string, error)
-	logoutFn           func(userID int64) error
+	registerUserFn     func(ctx context.Context, user *domain.User) (*domain.OpaqueToken, error)
+	activateUserFn     func(ctx context.Context, tokenPlainText string) (string, string, error)
+	authenticateUserFn func(ctx context.Context, email, password string) (string, string, error)
+	getUserByIDFn      func(ctx context.Context, userID int64) (*domain.UserDetails, error)
+	refreshTokenFn     func(ctx context.Context, oldRefreshToken string) (string, string, error)
+	logoutFn           func(ctx context.Context, userID int64) error
 	getIssuerFn        func() string
 	getJWKSFn          func(r *http.Request) (json.RawMessage, error)
 	validateJWTTokenFn func(tokenString string, issuer string) (*jwt.Token, error)
@@ -36,54 +37,62 @@ type mockIdentityService struct {
 	getIssuerCalls        int
 	getJWKSCalls          int
 	validateJWTTokenCalls int
+
+	lastContext context.Context
 }
 
-func (m *mockIdentityService) RegisterUser(user *domain.User) (*domain.OpaqueToken, error) {
+func (m *mockIdentityService) RegisterUser(ctx context.Context, user *domain.User) (*domain.OpaqueToken, error) {
 	m.registerUserCalls++
+	m.lastContext = ctx
 	if m.registerUserFn == nil {
 		panic("unexpected RegisterUser call")
 	}
-	return m.registerUserFn(user)
+	return m.registerUserFn(ctx, user)
 }
 
-func (m *mockIdentityService) ActivateUser(tokenPlainText string) (string, string, error) {
+func (m *mockIdentityService) ActivateUser(ctx context.Context, tokenPlainText string) (string, string, error) {
 	m.activateUserCalls++
+	m.lastContext = ctx
 	if m.activateUserFn == nil {
 		panic("unexpected ActivateUser call")
 	}
-	return m.activateUserFn(tokenPlainText)
+	return m.activateUserFn(ctx, tokenPlainText)
 }
 
-func (m *mockIdentityService) AuthenticateUser(email, password string) (string, string, error) {
+func (m *mockIdentityService) AuthenticateUser(ctx context.Context, email, password string) (string, string, error) {
 	m.authenticateUserCalls++
+	m.lastContext = ctx
 	if m.authenticateUserFn == nil {
 		panic("unexpected AuthenticateUser call")
 	}
-	return m.authenticateUserFn(email, password)
+	return m.authenticateUserFn(ctx, email, password)
 }
 
-func (m *mockIdentityService) GetUserById(userID int64) (*domain.UserDetails, error) {
+func (m *mockIdentityService) GetUserById(ctx context.Context, userID int64) (*domain.UserDetails, error) {
 	m.getUserByIDCalls++
+	m.lastContext = ctx
 	if m.getUserByIDFn == nil {
 		panic("unexpected GetUserById call")
 	}
-	return m.getUserByIDFn(userID)
+	return m.getUserByIDFn(ctx, userID)
 }
 
-func (m *mockIdentityService) RefreshToken(oldRefreshToken string) (string, string, error) {
+func (m *mockIdentityService) RefreshToken(ctx context.Context, oldRefreshToken string) (string, string, error) {
 	m.refreshTokenCalls++
+	m.lastContext = ctx
 	if m.refreshTokenFn == nil {
 		panic("unexpected RefreshToken call")
 	}
-	return m.refreshTokenFn(oldRefreshToken)
+	return m.refreshTokenFn(ctx, oldRefreshToken)
 }
 
-func (m *mockIdentityService) Logout(userID int64) error {
+func (m *mockIdentityService) Logout(ctx context.Context, userID int64) error {
 	m.logoutCalls++
+	m.lastContext = ctx
 	if m.logoutFn == nil {
 		panic("unexpected Logout call")
 	}
-	return m.logoutFn(userID)
+	return m.logoutFn(ctx, userID)
 }
 
 func (m *mockIdentityService) GetIssuer() string {
@@ -185,21 +194,25 @@ type authFixtureUsersRepo struct {
 	user *domain.User
 }
 
-func (r *authFixtureUsersRepo) InsertUser(*domain.User) error { panic("unexpected InsertUser call") }
-func (r *authFixtureUsersRepo) UpdateUser(*domain.User) error { panic("unexpected UpdateUser call") }
-func (r *authFixtureUsersRepo) GetUserForOpaqueToken(domain.TokenScope, string) (*domain.User, error) {
+func (r *authFixtureUsersRepo) InsertUser(context.Context, *domain.User) error {
+	panic("unexpected InsertUser call")
+}
+func (r *authFixtureUsersRepo) UpdateUser(context.Context, *domain.User) error {
+	panic("unexpected UpdateUser call")
+}
+func (r *authFixtureUsersRepo) GetUserForOpaqueToken(context.Context, domain.TokenScope, string) (*domain.User, error) {
 	panic("unexpected GetUserForOpaqueToken call")
 }
-func (r *authFixtureUsersRepo) GetUserByEmail(string) (*domain.User, error) {
+func (r *authFixtureUsersRepo) GetUserByEmail(context.Context, string) (*domain.User, error) {
 	return r.user, nil
 }
-func (r *authFixtureUsersRepo) GetUserById(int64) (*domain.User, error) {
+func (r *authFixtureUsersRepo) GetUserById(context.Context, int64) (*domain.User, error) {
 	panic("unexpected GetUserById call")
 }
 
 type authFixtureTokensRepo struct{}
 
-func (r *authFixtureTokensRepo) NewOpaqueToken(userID int64, ttl time.Duration, scope domain.TokenScope) (*domain.OpaqueToken, error) {
+func (r *authFixtureTokensRepo) NewOpaqueToken(ctx context.Context, userID int64, ttl time.Duration, scope domain.TokenScope) (*domain.OpaqueToken, error) {
 	return &domain.OpaqueToken{
 		UserID:    userID,
 		Scope:     scope,
@@ -208,16 +221,18 @@ func (r *authFixtureTokensRepo) NewOpaqueToken(userID int64, ttl time.Duration, 
 	}, nil
 }
 
-func (r *authFixtureTokensRepo) DeleteAllFromUser(domain.TokenScope, int64) error { return nil }
+func (r *authFixtureTokensRepo) DeleteAllFromUser(context.Context, domain.TokenScope, int64) error {
+	return nil
+}
 
 type authFixtureRolesRepo struct {
 	roles domain.Roles
 }
 
-func (r *authFixtureRolesRepo) GetAllRolesForUser(int64) (domain.Roles, error) {
+func (r *authFixtureRolesRepo) GetAllRolesForUser(context.Context, int64) (domain.Roles, error) {
 	return r.roles, nil
 }
-func (r *authFixtureRolesRepo) AddRoleForUser(int64, ...string) error {
+func (r *authFixtureRolesRepo) AddRoleForUser(context.Context, int64, ...string) error {
 	panic("unexpected AddRoleForUser call")
 }
 
@@ -253,7 +268,7 @@ func newJWTFixtureServiceAndToken(t *testing.T, userID int64, roles []string) (I
 		t.Fatalf("setup failed creating identity service: %v", err)
 	}
 
-	_, accessToken, err := svc.AuthenticateUser("alice@example.com", "correct horse battery staple")
+	_, accessToken, err := svc.AuthenticateUser(context.Background(), "alice@example.com", "correct horse battery staple")
 	if err != nil {
 		t.Fatalf("setup failed creating access token: %v", err)
 	}

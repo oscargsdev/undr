@@ -9,7 +9,7 @@ import (
 	"github.com/oscargsdev/undr/internal/identity/store"
 )
 
-func (r *repository) InsertUser(user *domain.User) error {
+func (r *repository) InsertUser(ctx context.Context, user *domain.User) error {
 	query := `
         INSERT INTO users (username, email, password_hash, activated) 
         VALUES ($1, $2, $3, $4)
@@ -17,7 +17,7 @@ func (r *repository) InsertUser(user *domain.User) error {
 
 	args := []any{user.Username, user.Email, user.Password.Hash, user.Activated}
 
-	ctx, cancel := context.WithTimeout(context.Background(), r.dbTimeout)
+	ctx, cancel := context.WithTimeout(ctx, r.dbTimeout)
 	defer cancel()
 
 	err := r.db.QueryRowContext(ctx, query, args...).Scan(&user.ID, &user.CreatedAt, &user.Version)
@@ -28,7 +28,7 @@ func (r *repository) InsertUser(user *domain.User) error {
 	return nil
 }
 
-func (r *repository) UpdateUser(user *domain.User) error {
+func (r *repository) UpdateUser(ctx context.Context, user *domain.User) error {
 	query := `
         UPDATE users 
         SET username = $1, email = $2, password_hash = $3, activated = $4, version = version + 1
@@ -44,7 +44,7 @@ func (r *repository) UpdateUser(user *domain.User) error {
 		user.Version,
 	}
 
-	ctx, cancel := context.WithTimeout(context.Background(), r.dbTimeout)
+	ctx, cancel := context.WithTimeout(ctx, r.dbTimeout)
 	defer cancel()
 
 	err := r.db.QueryRowContext(ctx, query, args...).Scan(&user.Version)
@@ -60,7 +60,7 @@ func (r *repository) UpdateUser(user *domain.User) error {
 	return nil
 }
 
-func (r *repository) GetUserByEmail(email string) (*domain.User, error) {
+func (r *repository) GetUserByEmail(ctx context.Context, email string) (*domain.User, error) {
 	query := `
         SELECT id, created_at, username, email, password_hash, activated, version
         FROM users
@@ -68,7 +68,7 @@ func (r *repository) GetUserByEmail(email string) (*domain.User, error) {
 
 	var user domain.User
 
-	ctx, cancel := context.WithTimeout(context.Background(), r.dbTimeout)
+	ctx, cancel := context.WithTimeout(ctx, r.dbTimeout)
 	defer cancel()
 
 	err := r.db.QueryRowContext(ctx, query, email).Scan(
@@ -93,7 +93,7 @@ func (r *repository) GetUserByEmail(email string) (*domain.User, error) {
 	return &user, nil
 }
 
-func (r *repository) GetUserById(userId int64) (*domain.User, error) {
+func (r *repository) GetUserById(ctx context.Context, userId int64) (*domain.User, error) {
 	query := `
         SELECT id, created_at, username, email, password_hash, activated, version
         FROM users
@@ -101,7 +101,7 @@ func (r *repository) GetUserById(userId int64) (*domain.User, error) {
 
 	var user domain.User
 
-	ctx, cancel := context.WithTimeout(context.Background(), r.dbTimeout)
+	ctx, cancel := context.WithTimeout(ctx, r.dbTimeout)
 	defer cancel()
 
 	err := r.db.QueryRowContext(ctx, query, userId).Scan(

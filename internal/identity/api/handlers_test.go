@@ -1,6 +1,7 @@
 package api
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"net/http"
@@ -87,7 +88,7 @@ func TestHandler_RegisterUserHandler(t *testing.T) {
 			name: "duplicate email maps to validation error",
 			body: `{"username":"alice","email":"alice@example.com","password":"super-secure"}`,
 			setup: func(svc *mockIdentityService) {
-				svc.registerUserFn = func(user *domain.User) (*domain.OpaqueToken, error) {
+				svc.registerUserFn = func(ctx context.Context, user *domain.User) (*domain.OpaqueToken, error) {
 					return nil, service.ErrDuplicateEmail
 				}
 			},
@@ -103,7 +104,7 @@ func TestHandler_RegisterUserHandler(t *testing.T) {
 			name: "duplicate username maps to validation error",
 			body: `{"username":"alice","email":"alice@example.com","password":"super-secure"}`,
 			setup: func(svc *mockIdentityService) {
-				svc.registerUserFn = func(user *domain.User) (*domain.OpaqueToken, error) {
+				svc.registerUserFn = func(ctx context.Context, user *domain.User) (*domain.OpaqueToken, error) {
 					return nil, service.ErrDuplicateUsername
 				}
 			},
@@ -119,7 +120,7 @@ func TestHandler_RegisterUserHandler(t *testing.T) {
 			name: "unexpected service error returns internal server error",
 			body: `{"username":"alice","email":"alice@example.com","password":"super-secure"}`,
 			setup: func(svc *mockIdentityService) {
-				svc.registerUserFn = func(user *domain.User) (*domain.OpaqueToken, error) {
+				svc.registerUserFn = func(ctx context.Context, user *domain.User) (*domain.OpaqueToken, error) {
 					return nil, errors.New("db unavailable")
 				}
 			},
@@ -135,7 +136,7 @@ func TestHandler_RegisterUserHandler(t *testing.T) {
 			name: "success returns accepted user payload",
 			body: `{"username":"alice","email":"alice@example.com","password":"super-secure"}`,
 			setup: func(svc *mockIdentityService) {
-				svc.registerUserFn = func(user *domain.User) (*domain.OpaqueToken, error) {
+				svc.registerUserFn = func(ctx context.Context, user *domain.User) (*domain.OpaqueToken, error) {
 					return &domain.OpaqueToken{Plaintext: "activation-token"}, nil
 				}
 			},
@@ -192,6 +193,27 @@ func TestHandler_RegisterUserHandler(t *testing.T) {
 	}
 }
 
+func TestHandler_RegisterUserHandlerPassesRequestContext(t *testing.T) {
+	svc := &mockIdentityService{
+		registerUserFn: func(ctx context.Context, user *domain.User) (*domain.OpaqueToken, error) {
+			return &domain.OpaqueToken{Plaintext: "activation-token"}, nil
+		},
+	}
+	handler := newTestHandler(svc)
+
+	req := httptest.NewRequest(http.MethodPost, "/register", strings.NewReader(
+		`{"username":"alice","email":"alice@example.com","password":"super-secure"}`,
+	))
+	rr := httptest.NewRecorder()
+
+	handler.registerUserHandler(rr, req)
+
+	assertStatus(t, rr, http.StatusAccepted)
+	if svc.lastContext != req.Context() {
+		t.Fatal("expected RegisterUser to receive the request context")
+	}
+}
+
 func TestHandler_ActivateUserHandler(t *testing.T) {
 	tests := []struct {
 		name       string
@@ -226,7 +248,7 @@ func TestHandler_ActivateUserHandler(t *testing.T) {
 			name: "record not found maps to token validation error",
 			body: `{"activationToken":"` + strings.Repeat("a", 26) + `"}`,
 			setup: func(svc *mockIdentityService) {
-				svc.activateUserFn = func(tokenPlainText string) (string, string, error) {
+				svc.activateUserFn = func(ctx context.Context, tokenPlainText string) (string, string, error) {
 					return "", "", service.ErrRecordNotFound
 				}
 			},
@@ -242,7 +264,7 @@ func TestHandler_ActivateUserHandler(t *testing.T) {
 			name: "edit conflict maps to conflict status",
 			body: `{"activationToken":"` + strings.Repeat("a", 26) + `"}`,
 			setup: func(svc *mockIdentityService) {
-				svc.activateUserFn = func(tokenPlainText string) (string, string, error) {
+				svc.activateUserFn = func(ctx context.Context, tokenPlainText string) (string, string, error) {
 					return "", "", service.ErrEditConflict
 				}
 			},
@@ -258,7 +280,7 @@ func TestHandler_ActivateUserHandler(t *testing.T) {
 			name: "unexpected service error returns internal server error",
 			body: `{"activationToken":"` + strings.Repeat("a", 26) + `"}`,
 			setup: func(svc *mockIdentityService) {
-				svc.activateUserFn = func(tokenPlainText string) (string, string, error) {
+				svc.activateUserFn = func(ctx context.Context, tokenPlainText string) (string, string, error) {
 					return "", "", errors.New("boom")
 				}
 			},
@@ -274,7 +296,7 @@ func TestHandler_ActivateUserHandler(t *testing.T) {
 			name: "success returns access token and sets refresh cookie",
 			body: `{"activationToken":"` + strings.Repeat("a", 26) + `"}`,
 			setup: func(svc *mockIdentityService) {
-				svc.activateUserFn = func(tokenPlainText string) (string, string, error) {
+				svc.activateUserFn = func(ctx context.Context, tokenPlainText string) (string, string, error) {
 					return "new-refresh-token", "new-access-token", nil
 				}
 			},
@@ -388,7 +410,7 @@ func TestHandler_AuthenticateUserHandler(t *testing.T) {
 			name: "record not found returns invalid credentials",
 			body: `{"email":"alice@example.com","password":"super-secure"}`,
 			setup: func(svc *mockIdentityService) {
-				svc.authenticateUserFn = func(email, password string) (string, string, error) {
+				svc.authenticateUserFn = func(ctx context.Context, email, password string) (string, string, error) {
 					return "", "", service.ErrRecordNotFound
 				}
 			},
@@ -404,7 +426,7 @@ func TestHandler_AuthenticateUserHandler(t *testing.T) {
 			name: "invalid credentials returns invalid credentials",
 			body: `{"email":"alice@example.com","password":"super-secure"}`,
 			setup: func(svc *mockIdentityService) {
-				svc.authenticateUserFn = func(email, password string) (string, string, error) {
+				svc.authenticateUserFn = func(ctx context.Context, email, password string) (string, string, error) {
 					return "", "", service.ErrInvalidCredentials
 				}
 			},
@@ -420,7 +442,7 @@ func TestHandler_AuthenticateUserHandler(t *testing.T) {
 			name: "user not activated returns forbidden",
 			body: `{"email":"alice@example.com","password":"super-secure"}`,
 			setup: func(svc *mockIdentityService) {
-				svc.authenticateUserFn = func(email, password string) (string, string, error) {
+				svc.authenticateUserFn = func(ctx context.Context, email, password string) (string, string, error) {
 					return "", "", service.ErrUserNotActivated
 				}
 			},
@@ -436,7 +458,7 @@ func TestHandler_AuthenticateUserHandler(t *testing.T) {
 			name: "unexpected service error returns internal server error",
 			body: `{"email":"alice@example.com","password":"super-secure"}`,
 			setup: func(svc *mockIdentityService) {
-				svc.authenticateUserFn = func(email, password string) (string, string, error) {
+				svc.authenticateUserFn = func(ctx context.Context, email, password string) (string, string, error) {
 					return "", "", errors.New("db timeout")
 				}
 			},
@@ -452,7 +474,7 @@ func TestHandler_AuthenticateUserHandler(t *testing.T) {
 			name: "success sets refresh cookie and returns access token",
 			body: `{"email":"alice@example.com","password":"super-secure"}`,
 			setup: func(svc *mockIdentityService) {
-				svc.authenticateUserFn = func(email, password string) (string, string, error) {
+				svc.authenticateUserFn = func(ctx context.Context, email, password string) (string, string, error) {
 					return "new-refresh-token", "new-access-token", nil
 				}
 			},
@@ -526,7 +548,7 @@ func TestHandler_RefreshTokenHandler(t *testing.T) {
 			cookie:     &http.Cookie{Name: "refresh_token", Value: strings.Repeat("r", 26)},
 			wantStatus: http.StatusBadRequest,
 			setup: func(svc *mockIdentityService) {
-				svc.refreshTokenFn = func(oldRefreshToken string) (string, string, error) {
+				svc.refreshTokenFn = func(ctx context.Context, oldRefreshToken string) (string, string, error) {
 					return "", "", service.ErrRecordNotFound
 				}
 			},
@@ -542,7 +564,7 @@ func TestHandler_RefreshTokenHandler(t *testing.T) {
 			cookie:     &http.Cookie{Name: "refresh_token", Value: strings.Repeat("r", 26)},
 			wantStatus: http.StatusInternalServerError,
 			setup: func(svc *mockIdentityService) {
-				svc.refreshTokenFn = func(oldRefreshToken string) (string, string, error) {
+				svc.refreshTokenFn = func(ctx context.Context, oldRefreshToken string) (string, string, error) {
 					return "", "", errors.New("unexpected error")
 				}
 			},
@@ -558,7 +580,7 @@ func TestHandler_RefreshTokenHandler(t *testing.T) {
 			cookie:     &http.Cookie{Name: "refresh_token", Value: strings.Repeat("r", 26)},
 			wantStatus: http.StatusOK,
 			setup: func(svc *mockIdentityService) {
-				svc.refreshTokenFn = func(oldRefreshToken string) (string, string, error) {
+				svc.refreshTokenFn = func(ctx context.Context, oldRefreshToken string) (string, string, error) {
 					return "rotated-refresh", "new-access", nil
 				}
 			},
@@ -614,7 +636,7 @@ func TestHandler_LogoutHandler(t *testing.T) {
 
 	t.Run("service error returns internal server error", func(t *testing.T) {
 		svc := &mockIdentityService{
-			logoutFn: func(userID int64) error {
+			logoutFn: func(ctx context.Context, userID int64) error {
 				if userID != 77 {
 					t.Fatalf("expected userID 77, got %d", userID)
 				}
@@ -637,7 +659,7 @@ func TestHandler_LogoutHandler(t *testing.T) {
 
 	t.Run("success clears refresh cookie and returns no content", func(t *testing.T) {
 		svc := &mockIdentityService{
-			logoutFn: func(userID int64) error {
+			logoutFn: func(ctx context.Context, userID int64) error {
 				if userID != 77 {
 					t.Fatalf("expected userID 77, got %d", userID)
 				}
@@ -730,7 +752,7 @@ func TestHandler_myInfoHandler(t *testing.T) {
 			withAuth:   true,
 			authUserID: 12,
 			setup: func(svc *mockIdentityService) {
-				svc.getUserByIDFn = func(userID int64) (*domain.UserDetails, error) {
+				svc.getUserByIDFn = func(ctx context.Context, userID int64) (*domain.UserDetails, error) {
 					return nil, service.ErrRecordNotFound
 				}
 			},
@@ -748,7 +770,7 @@ func TestHandler_myInfoHandler(t *testing.T) {
 			withAuth:   true,
 			authUserID: 12,
 			setup: func(svc *mockIdentityService) {
-				svc.getUserByIDFn = func(userID int64) (*domain.UserDetails, error) {
+				svc.getUserByIDFn = func(ctx context.Context, userID int64) (*domain.UserDetails, error) {
 					return nil, service.ErrUserWithoutRoles
 				}
 			},
@@ -766,7 +788,7 @@ func TestHandler_myInfoHandler(t *testing.T) {
 			withAuth:   true,
 			authUserID: 12,
 			setup: func(svc *mockIdentityService) {
-				svc.getUserByIDFn = func(userID int64) (*domain.UserDetails, error) {
+				svc.getUserByIDFn = func(ctx context.Context, userID int64) (*domain.UserDetails, error) {
 					return nil, errors.New("boom")
 				}
 			},
@@ -784,7 +806,7 @@ func TestHandler_myInfoHandler(t *testing.T) {
 			withAuth:   true,
 			authUserID: 12,
 			setup: func(svc *mockIdentityService) {
-				svc.getUserByIDFn = func(userID int64) (*domain.UserDetails, error) {
+				svc.getUserByIDFn = func(ctx context.Context, userID int64) (*domain.UserDetails, error) {
 					return &domain.UserDetails{
 						User: domain.User{
 							ID:        12,

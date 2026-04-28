@@ -26,28 +26,28 @@ func generateOpaqueToken(userID int64, ttl time.Duration, scope domain.TokenScop
 	return token
 }
 
-func (r *repository) insertOpaqueToken(token *domain.OpaqueToken) error {
+func (r *repository) insertOpaqueToken(ctx context.Context, token *domain.OpaqueToken) error {
 	query := `
         INSERT INTO tokens (hash, user_id, expiry, scope) 
         VALUES ($1, $2, $3, $4)`
 
 	args := []any{token.Hash, token.UserID, token.Expiry, string(token.Scope)}
 
-	ctx, cancel := context.WithTimeout(context.Background(), r.dbTimeout)
+	ctx, cancel := context.WithTimeout(ctx, r.dbTimeout)
 	defer cancel()
 
 	_, err := r.db.ExecContext(ctx, query, args...)
 	return err
 }
 
-func (r *repository) NewOpaqueToken(userID int64, ttl time.Duration, scope domain.TokenScope) (*domain.OpaqueToken, error) {
+func (r *repository) NewOpaqueToken(ctx context.Context, userID int64, ttl time.Duration, scope domain.TokenScope) (*domain.OpaqueToken, error) {
 	token := generateOpaqueToken(userID, ttl, scope)
 
-	err := r.insertOpaqueToken(token)
+	err := r.insertOpaqueToken(ctx, token)
 	return token, err
 }
 
-func (r *repository) GetUserForOpaqueToken(tokenScope domain.TokenScope, tokenPlaintext string) (*domain.User, error) {
+func (r *repository) GetUserForOpaqueToken(ctx context.Context, tokenScope domain.TokenScope, tokenPlaintext string) (*domain.User, error) {
 	tokenHash := sha256.Sum256([]byte(tokenPlaintext))
 
 	query := `
@@ -63,7 +63,7 @@ func (r *repository) GetUserForOpaqueToken(tokenScope domain.TokenScope, tokenPl
 
 	var user domain.User
 
-	ctx, cancel := context.WithTimeout(context.Background(), r.dbTimeout)
+	ctx, cancel := context.WithTimeout(ctx, r.dbTimeout)
 	defer cancel()
 
 	err := r.db.QueryRowContext(ctx, query, args...).Scan(
@@ -87,12 +87,12 @@ func (r *repository) GetUserForOpaqueToken(tokenScope domain.TokenScope, tokenPl
 	return &user, nil
 }
 
-func (r *repository) DeleteAllFromUser(scope domain.TokenScope, userID int64) error {
+func (r *repository) DeleteAllFromUser(ctx context.Context, scope domain.TokenScope, userID int64) error {
 	query := `
         DELETE FROM tokens 
         WHERE scope = $1 AND user_id = $2`
 
-	ctx, cancel := context.WithTimeout(context.Background(), r.dbTimeout)
+	ctx, cancel := context.WithTimeout(ctx, r.dbTimeout)
 	defer cancel()
 
 	_, err := r.db.ExecContext(ctx, query, string(scope), userID)
