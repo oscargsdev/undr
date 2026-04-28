@@ -51,6 +51,16 @@ type rolesRepository interface {
 	AddRoleForUser(context.Context, int64, ...string) error
 }
 
+type RepositorySet interface {
+	usersRepository
+	opaqueTokensRepository
+	rolesRepository
+}
+
+type transactor interface {
+	WithinTx(context.Context, func(RepositorySet) error) error
+}
+
 type claims struct {
 	Roles []string `json:"roles"`
 	jwt.RegisteredClaims
@@ -62,6 +72,7 @@ type Config struct {
 	UsersRepository        usersRepository
 	OpaqueTokensRepository opaqueTokensRepository
 	RolesRepository        rolesRepository
+	Transactor             transactor
 	Logger                 *slog.Logger
 	Issuer                 string
 	JWTExpiration          time.Duration

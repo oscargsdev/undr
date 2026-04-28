@@ -54,6 +54,7 @@ func New(cfg Config) (*Module, error) {
 		UsersRepository:        repo,
 		OpaqueTokensRepository: repo,
 		RolesRepository:        repo,
+		Transactor:             repo,
 		Logger:                 cfg.Logger,
 		Issuer:                 cfg.Issuer,
 		JWTExpiration:          cfg.JWTExpiration,
