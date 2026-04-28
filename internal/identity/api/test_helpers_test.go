@@ -236,6 +236,20 @@ func (r *authFixtureRolesRepo) AddRoleForUser(context.Context, int64, ...string)
 	panic("unexpected AddRoleForUser call")
 }
 
+type authFixtureRepositorySet struct {
+	*authFixtureUsersRepo
+	*authFixtureTokensRepo
+	*authFixtureRolesRepo
+}
+
+type authFixtureTransactor struct {
+	repos service.RepositorySet
+}
+
+func (t *authFixtureTransactor) WithinTx(ctx context.Context, fn func(service.RepositorySet) error) error {
+	return fn(t.repos)
+}
+
 func newJWTFixtureServiceAndToken(t *testing.T, userID int64, roles []string) (IdentityService, string) {
 	t.Helper()
 
@@ -253,11 +267,19 @@ func newJWTFixtureServiceAndToken(t *testing.T, userID int64, roles []string) (I
 			Activated: true,
 		},
 	}
+	tokens := &authFixtureTokensRepo{}
+	rolesRepo := &authFixtureRolesRepo{roles: roles}
+	repos := &authFixtureRepositorySet{
+		authFixtureUsersRepo:  users,
+		authFixtureTokensRepo: tokens,
+		authFixtureRolesRepo:  rolesRepo,
+	}
 
 	svc, err := service.New(service.Config{
 		UsersRepository:        users,
-		OpaqueTokensRepository: &authFixtureTokensRepo{},
-		RolesRepository:        &authFixtureRolesRepo{roles: roles},
+		OpaqueTokensRepository: tokens,
+		RolesRepository:        rolesRepo,
+		Transactor:             &authFixtureTransactor{repos: repos},
 		Logger:                 newTestLogger(),
 		Issuer:                 "https://issuer.example",
 		JWTExpiration:          time.Hour,

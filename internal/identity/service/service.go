@@ -218,16 +218,23 @@ func (s *identityService) AuthenticateUser(ctx context.Context, email, password 
 		return "", "", ErrUserNotActivated
 	}
 
-	err = s.cfg.OpaqueTokensRepository.DeleteAllFromUser(ctx, domain.ScopeRefresh, user.ID)
-	if err != nil {
-		return "", "", mapRepositoryError(err)
-	}
+	err = s.cfg.Transactor.WithinTx(ctx, func(repos RepositorySet) error {
+		err = repos.DeleteAllFromUser(ctx, domain.ScopeRefresh, user.ID)
+		if err != nil {
+			return err
+		}
 
-	refreshToken, err := s.cfg.OpaqueTokensRepository.NewOpaqueToken(ctx, user.ID, s.cfg.RefreshExpiration, domain.ScopeRefresh)
+		refreshToken, err := repos.NewOpaqueToken(ctx, user.ID, s.cfg.RefreshExpiration, domain.ScopeRefresh)
+		if err != nil {
+			return err
+		}
+		refreshTokenString = refreshToken.Plaintext
+
+		return nil
+	})
 	if err != nil {
 		return "", "", mapRepositoryError(err)
 	}
-	refreshTokenString = refreshToken.Plaintext
 
 	accessTokenString, err = s.newAccessToken(user.ID, roles, s.cfg.JWTExpiration, s.cfg.Issuer)
 	if err != nil {
