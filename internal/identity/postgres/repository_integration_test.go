@@ -17,7 +17,7 @@ import (
 	"github.com/oscargsdev/undr/internal/identity/store"
 )
 
-const postgresIntegrationDSNEnv = "UNDR_TEST_DB_DSN"
+const postgresIntegrationDSNEnv = "UNDR_REPOSITORY_TEST_DB_DSN"
 
 func newPostgresIntegrationRepo(t *testing.T) (*sql.DB, *repository) {
 	t.Helper()
