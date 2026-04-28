@@ -118,17 +118,26 @@ func New(cfg Config) (*identityService, error) {
 }
 
 func (s *identityService) RegisterUser(ctx context.Context, user *domain.User) (*domain.OpaqueToken, error) {
-	err := s.cfg.UsersRepository.InsertUser(ctx, user)
-	if err != nil {
-		return nil, mapRepositoryError(err)
-	}
+	var activationToken *domain.OpaqueToken
 
-	err = s.cfg.RolesRepository.AddRoleForUser(ctx, user.ID, "user")
-	if err != nil {
-		return nil, mapRepositoryError(err)
-	}
+	err := s.cfg.Transactor.WithinTx(ctx, func(repos RepositorySet) error {
+		err := repos.InsertUser(ctx, user)
+		if err != nil {
+			return err
+		}
 
-	activationToken, err := s.cfg.OpaqueTokensRepository.NewOpaqueToken(ctx, user.ID, s.cfg.ActivationExpiration, domain.ScopeActivation)
+		err = repos.AddRoleForUser(ctx, user.ID, "user")
+		if err != nil {
+			return err
+		}
+
+		activationToken, err = repos.NewOpaqueToken(ctx, user.ID, s.cfg.ActivationExpiration, domain.ScopeActivation)
+		if err != nil {
+			return err
+		}
+
+		return nil
+	})
 	if err != nil {
 		return nil, mapRepositoryError(err)
 	}

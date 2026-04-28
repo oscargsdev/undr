@@ -159,17 +159,44 @@ func (m *rolesRepoMock) AddRoleForUser(ctx context.Context, userID int64, codes 
 	return m.addRoleForUserFn(ctx, userID, codes...)
 }
 
+type repositorySetMock struct {
+	usersRepository
+	opaqueTokensRepository
+	rolesRepository
+}
+
+type transactorMock struct {
+	repos RepositorySet
+
+	calls       int
+	lastContext context.Context
+}
+
+func (m *transactorMock) WithinTx(ctx context.Context, fn func(RepositorySet) error) error {
+	m.calls++
+	m.lastContext = ctx
+	return fn(m.repos)
+}
+
 func newTestIdentityService(t *testing.T) (*identityService, *usersRepoMock, *tokensRepoMock, *rolesRepoMock) {
 	t.Helper()
 
 	users := &usersRepoMock{}
 	tokens := &tokensRepoMock{}
 	roles := &rolesRepoMock{}
+	tx := &transactorMock{
+		repos: &repositorySetMock{
+			usersRepository:        users,
+			opaqueTokensRepository: tokens,
+			rolesRepository:        roles,
+		},
+	}
 
 	svc, err := New(Config{
 		UsersRepository:        users,
 		OpaqueTokensRepository: tokens,
 		RolesRepository:        roles,
+		Transactor:             tx,
 		Issuer:                 "https://issuer.example",
 		JWTExpiration:          5 * time.Minute,
 		RefreshExpiration:      24 * time.Hour,
@@ -360,6 +387,7 @@ func TestIdentityService_RegisterUser(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			svc, users, tokens, roles := newTestIdentityService(t)
+			tx := svc.cfg.Transactor.(*transactorMock)
 
 			users.insertFn = func(ctx context.Context, user *domain.User) error {
 				if tt.insertErr != nil {
@@ -399,6 +427,9 @@ func TestIdentityService_RegisterUser(t *testing.T) {
 			if len(tokens.newOpaqueTokenCalls) != tt.wantNewTokenCalls {
 				t.Fatalf("expected NewOpaqueToken calls %d, got %d", tt.wantNewTokenCalls, len(tokens.newOpaqueTokenCalls))
 			}
+			if tx.calls != 1 {
+				t.Fatalf("expected WithinTx to be called once, got %d", tx.calls)
+			}
 
 			if tt.wantErr == nil {
 				if roles.lastAddUserID != 99 {
@@ -423,6 +454,7 @@ func TestIdentityService_RegisterUser(t *testing.T) {
 
 func TestIdentityService_RegisterUserPassesContextToRepositories(t *testing.T) {
 	svc, users, tokens, roles := newTestIdentityService(t)
+	tx := svc.cfg.Transactor.(*transactorMock)
 	ctx := context.WithValue(context.Background(), contextKey("test-context"), "request")
 
 	users.insertFn = func(ctx context.Context, user *domain.User) error {
@@ -444,11 +476,85 @@ func TestIdentityService_RegisterUserPassesContextToRepositories(t *testing.T) {
 	if users.lastContext != ctx {
 		t.Fatal("expected users repository to receive request context")
 	}
+	if tx.lastContext != ctx {
+		t.Fatal("expected transactor to receive request context")
+	}
 	if roles.lastContext != ctx {
 		t.Fatal("expected roles repository to receive request context")
 	}
 	if tokens.lastContext != ctx {
 		t.Fatal("expected tokens repository to receive request context")
+	}
+}
+
+func TestIdentityService_RegisterUserUsesTransactionRepositorySet(t *testing.T) {
+	rootUsers := &usersRepoMock{
+		insertFn: func(ctx context.Context, user *domain.User) error {
+			t.Fatal("expected RegisterUser to use transaction users repository")
+			return nil
+		},
+	}
+	rootTokens := &tokensRepoMock{
+		newOpaqueTokenFn: func(ctx context.Context, userID int64, ttl time.Duration, scope domain.TokenScope) (*domain.OpaqueToken, error) {
+			t.Fatal("expected RegisterUser to use transaction tokens repository")
+			return nil, nil
+		},
+	}
+	rootRoles := &rolesRepoMock{
+		addRoleForUserFn: func(ctx context.Context, userID int64, codes ...string) error {
+			t.Fatal("expected RegisterUser to use transaction roles repository")
+			return nil
+		},
+	}
+
+	txUsers := &usersRepoMock{
+		insertFn: func(ctx context.Context, user *domain.User) error {
+			user.ID = 99
+			return nil
+		},
+	}
+	txTokens := &tokensRepoMock{
+		newOpaqueTokenFn: func(ctx context.Context, userID int64, ttl time.Duration, scope domain.TokenScope) (*domain.OpaqueToken, error) {
+			return &domain.OpaqueToken{Plaintext: "activation-token"}, nil
+		},
+	}
+	txRoles := &rolesRepoMock{
+		addRoleForUserFn: func(ctx context.Context, userID int64, codes ...string) error {
+			return nil
+		},
+	}
+	tx := &transactorMock{
+		repos: &repositorySetMock{
+			usersRepository:        txUsers,
+			opaqueTokensRepository: txTokens,
+			rolesRepository:        txRoles,
+		},
+	}
+
+	svc, err := New(Config{
+		UsersRepository:        rootUsers,
+		OpaqueTokensRepository: rootTokens,
+		RolesRepository:        rootRoles,
+		Transactor:             tx,
+		Issuer:                 "https://issuer.example",
+		JWTExpiration:          5 * time.Minute,
+		RefreshExpiration:      24 * time.Hour,
+		ActivationExpiration:   48 * time.Hour,
+	})
+	if err != nil {
+		t.Fatalf("setup failed creating identity service: %v", err)
+	}
+
+	user := &domain.User{Username: "alice", Email: "alice@example.com", Password: domain.Password{Hash: []byte("hash")}}
+	if _, err := svc.RegisterUser(context.Background(), user); err != nil {
+		t.Fatalf("expected nil error, got %v", err)
+	}
+
+	if rootUsers.insertCalls != 0 || rootRoles.addRoleCalls != 0 || len(rootTokens.newOpaqueTokenCalls) != 0 {
+		t.Fatal("expected root repositories not to be used inside RegisterUser transaction")
+	}
+	if txUsers.insertCalls != 1 || txRoles.addRoleCalls != 1 || len(txTokens.newOpaqueTokenCalls) != 1 {
+		t.Fatal("expected transaction repositories to handle RegisterUser operations")
 	}
 }
 
