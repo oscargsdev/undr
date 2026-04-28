@@ -630,6 +630,7 @@ func TestIdentityService_ActivateUser(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			svc, users, tokens, roles := newTestIdentityService(t)
+			tx := svc.cfg.Transactor.(*transactorMock)
 			user := &domain.User{ID: 77, Activated: false, Password: domain.Password{Hash: []byte("hash")}}
 
 			users.getForTokenFn = func(ctx context.Context, scope domain.TokenScope, plaintext string) (*domain.User, error) {
@@ -684,6 +685,9 @@ func TestIdentityService_ActivateUser(t *testing.T) {
 			if len(tokens.newOpaqueTokenCalls) != tt.wantNewTokenCalls {
 				t.Fatalf("expected NewOpaqueToken calls %d, got %d", tt.wantNewTokenCalls, len(tokens.newOpaqueTokenCalls))
 			}
+			if tx.calls != 1 {
+				t.Fatalf("expected WithinTx to be called once, got %d", tx.calls)
+			}
 
 			if tt.wantErr == nil {
 				if users.lastTokenScope != domain.ScopeActivation {
@@ -703,6 +707,98 @@ func TestIdentityService_ActivateUser(t *testing.T) {
 				}
 			}
 		})
+	}
+}
+
+func TestIdentityService_ActivateUserUsesTransactionRepositorySet(t *testing.T) {
+	rootUsers := &usersRepoMock{
+		getForTokenFn: func(ctx context.Context, scope domain.TokenScope, plaintext string) (*domain.User, error) {
+			t.Fatal("expected ActivateUser to use transaction users repository")
+			return nil, nil
+		},
+		updateFn: func(ctx context.Context, user *domain.User) error {
+			t.Fatal("expected ActivateUser to use transaction users repository")
+			return nil
+		},
+	}
+	rootTokens := &tokensRepoMock{
+		deleteAllFromUserFn: func(ctx context.Context, scope domain.TokenScope, userID int64) error {
+			t.Fatal("expected ActivateUser to use transaction tokens repository")
+			return nil
+		},
+		newOpaqueTokenFn: func(ctx context.Context, userID int64, ttl time.Duration, scope domain.TokenScope) (*domain.OpaqueToken, error) {
+			t.Fatal("expected ActivateUser to use transaction tokens repository")
+			return nil, nil
+		},
+	}
+	rootRoles := &rolesRepoMock{
+		getAllForUserFn: func(ctx context.Context, userID int64) (domain.Roles, error) {
+			t.Fatal("expected ActivateUser to use transaction roles repository")
+			return nil, nil
+		},
+	}
+
+	txUsers := &usersRepoMock{
+		getForTokenFn: func(ctx context.Context, scope domain.TokenScope, plaintext string) (*domain.User, error) {
+			return &domain.User{ID: 77, Activated: false, Password: domain.Password{Hash: []byte("hash")}}, nil
+		},
+		updateFn: func(ctx context.Context, user *domain.User) error {
+			return nil
+		},
+	}
+	txTokens := &tokensRepoMock{
+		deleteAllFromUserFn: func(ctx context.Context, scope domain.TokenScope, userID int64) error {
+			return nil
+		},
+		newOpaqueTokenFn: func(ctx context.Context, userID int64, ttl time.Duration, scope domain.TokenScope) (*domain.OpaqueToken, error) {
+			return &domain.OpaqueToken{Plaintext: "refresh-token"}, nil
+		},
+	}
+	txRoles := &rolesRepoMock{
+		getAllForUserFn: func(ctx context.Context, userID int64) (domain.Roles, error) {
+			return domain.Roles{"user"}, nil
+		},
+	}
+	tx := &transactorMock{
+		repos: &repositorySetMock{
+			usersRepository:        txUsers,
+			opaqueTokensRepository: txTokens,
+			rolesRepository:        txRoles,
+		},
+	}
+
+	svc, err := New(Config{
+		UsersRepository:        rootUsers,
+		OpaqueTokensRepository: rootTokens,
+		RolesRepository:        rootRoles,
+		Transactor:             tx,
+		Issuer:                 "https://issuer.example",
+		JWTExpiration:          5 * time.Minute,
+		RefreshExpiration:      24 * time.Hour,
+		ActivationExpiration:   48 * time.Hour,
+	})
+	if err != nil {
+		t.Fatalf("setup failed creating identity service: %v", err)
+	}
+
+	refreshToken, accessToken, err := svc.ActivateUser(context.Background(), "activation-plaintext")
+	if err != nil {
+		t.Fatalf("expected nil error, got %v", err)
+	}
+	if refreshToken != "refresh-token" {
+		t.Fatalf("expected refresh token, got %q", refreshToken)
+	}
+	if accessToken == "" {
+		t.Fatal("expected access token")
+	}
+
+	if rootUsers.getForTokenCalls != 0 || rootUsers.updateCalls != 0 || rootRoles.getAllCalls != 0 ||
+		rootTokens.deleteCalls != 0 || len(rootTokens.newOpaqueTokenCalls) != 0 {
+		t.Fatal("expected root repositories not to be used inside ActivateUser transaction")
+	}
+	if txUsers.getForTokenCalls != 1 || txUsers.updateCalls != 1 || txRoles.getAllCalls != 1 ||
+		txTokens.deleteCalls != 1 || len(txTokens.newOpaqueTokenCalls) != 1 {
+		t.Fatal("expected transaction repositories to handle ActivateUser operations")
 	}
 }
 

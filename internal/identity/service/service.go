@@ -147,33 +147,43 @@ func (s *identityService) RegisterUser(ctx context.Context, user *domain.User) (
 }
 
 func (s *identityService) ActivateUser(ctx context.Context, tokenPlainText string) (refreshTokenString string, accessTokenString string, err error) {
-	user, err := s.cfg.UsersRepository.GetUserForOpaqueToken(ctx, domain.ScopeActivation, tokenPlainText)
+	var user *domain.User
+	var roles domain.Roles
+
+	err = s.cfg.Transactor.WithinTx(ctx, func(repos RepositorySet) error {
+		user, err = repos.GetUserForOpaqueToken(ctx, domain.ScopeActivation, tokenPlainText)
+		if err != nil {
+			return err
+		}
+
+		roles, err = repos.GetAllRolesForUser(ctx, user.ID)
+		if err != nil {
+			return err
+		}
+
+		user.Activated = true
+
+		err = repos.UpdateUser(ctx, user)
+		if err != nil {
+			return err
+		}
+
+		err = repos.DeleteAllFromUser(ctx, domain.ScopeActivation, user.ID)
+		if err != nil {
+			return err
+		}
+
+		refreshToken, err := repos.NewOpaqueToken(ctx, user.ID, s.cfg.RefreshExpiration, domain.ScopeRefresh)
+		if err != nil {
+			return err
+		}
+		refreshTokenString = refreshToken.Plaintext
+
+		return nil
+	})
 	if err != nil {
 		return "", "", mapRepositoryError(err)
 	}
-
-	roles, err := s.cfg.RolesRepository.GetAllRolesForUser(ctx, user.ID)
-	if err != nil {
-		return "", "", mapRepositoryError(err)
-	}
-
-	user.Activated = true
-
-	err = s.cfg.UsersRepository.UpdateUser(ctx, user)
-	if err != nil {
-		return "", "", mapRepositoryError(err)
-	}
-
-	err = s.cfg.OpaqueTokensRepository.DeleteAllFromUser(ctx, domain.ScopeActivation, user.ID)
-	if err != nil {
-		return "", "", mapRepositoryError(err)
-	}
-
-	refreshToken, err := s.cfg.OpaqueTokensRepository.NewOpaqueToken(ctx, user.ID, s.cfg.RefreshExpiration, domain.ScopeRefresh)
-	if err != nil {
-		return "", "", mapRepositoryError(err)
-	}
-	refreshTokenString = refreshToken.Plaintext
 
 	accessTokenString, err = s.newAccessToken(user.ID, roles, s.cfg.JWTExpiration, s.cfg.Issuer)
 	if err != nil {
