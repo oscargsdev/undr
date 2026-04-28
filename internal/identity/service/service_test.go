@@ -1062,6 +1062,7 @@ func TestIdentityService_RefreshToken(t *testing.T) {
 		wantGetRolesCalls int
 		wantDeleteCalls   int
 		wantNewTokenCalls int
+		wantTxCalls       int
 		wantRefreshToken  string
 		wantAccessToken   bool
 	}{
@@ -1071,6 +1072,7 @@ func TestIdentityService_RefreshToken(t *testing.T) {
 			wantGetRolesCalls: 1,
 			wantDeleteCalls:   1,
 			wantNewTokenCalls: 1,
+			wantTxCalls:       1,
 			wantRefreshToken:  "rotated-refresh-token",
 			wantAccessToken:   true,
 		},
@@ -1079,6 +1081,7 @@ func TestIdentityService_RefreshToken(t *testing.T) {
 			getUserErr:       store.ErrRecordNotFound,
 			wantErr:          ErrRecordNotFound,
 			wantGetUserCalls: 1,
+			wantTxCalls:      1,
 		},
 		{
 			name:              "get roles error mapped",
@@ -1086,6 +1089,7 @@ func TestIdentityService_RefreshToken(t *testing.T) {
 			wantErr:           ErrRecordNotFound,
 			wantGetUserCalls:  1,
 			wantGetRolesCalls: 1,
+			wantTxCalls:       1,
 		},
 		{
 			name:              "delete error mapped",
@@ -1094,6 +1098,7 @@ func TestIdentityService_RefreshToken(t *testing.T) {
 			wantGetUserCalls:  1,
 			wantGetRolesCalls: 1,
 			wantDeleteCalls:   1,
+			wantTxCalls:       1,
 		},
 		{
 			name:              "new token error mapped",
@@ -1103,12 +1108,14 @@ func TestIdentityService_RefreshToken(t *testing.T) {
 			wantGetRolesCalls: 1,
 			wantDeleteCalls:   1,
 			wantNewTokenCalls: 1,
+			wantTxCalls:       1,
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			svc, users, tokens, roles := newTestIdentityService(t)
+			tx := svc.cfg.Transactor.(*transactorMock)
 			users.getForTokenFn = func(ctx context.Context, scope domain.TokenScope, plaintext string) (*domain.User, error) {
 				if tt.getUserErr != nil {
 					return nil, tt.getUserErr
@@ -1155,6 +1162,9 @@ func TestIdentityService_RefreshToken(t *testing.T) {
 			if len(tokens.newOpaqueTokenCalls) != tt.wantNewTokenCalls {
 				t.Fatalf("expected NewOpaqueToken calls %d, got %d", tt.wantNewTokenCalls, len(tokens.newOpaqueTokenCalls))
 			}
+			if tx.calls != tt.wantTxCalls {
+				t.Fatalf("expected WithinTx calls %d, got %d", tt.wantTxCalls, tx.calls)
+			}
 
 			if tt.wantErr == nil {
 				if users.lastTokenScope != domain.ScopeRefresh {
@@ -1165,6 +1175,91 @@ func TestIdentityService_RefreshToken(t *testing.T) {
 				}
 			}
 		})
+	}
+}
+
+func TestIdentityService_RefreshTokenUsesTransactionRepositorySet(t *testing.T) {
+	rootUsers := &usersRepoMock{
+		getForTokenFn: func(ctx context.Context, scope domain.TokenScope, plaintext string) (*domain.User, error) {
+			t.Fatal("expected RefreshToken to use transaction users repository")
+			return nil, nil
+		},
+	}
+	rootTokens := &tokensRepoMock{
+		deleteAllFromUserFn: func(ctx context.Context, scope domain.TokenScope, userID int64) error {
+			t.Fatal("expected RefreshToken to use transaction tokens repository")
+			return nil
+		},
+		newOpaqueTokenFn: func(ctx context.Context, userID int64, ttl time.Duration, scope domain.TokenScope) (*domain.OpaqueToken, error) {
+			t.Fatal("expected RefreshToken to use transaction tokens repository")
+			return nil, nil
+		},
+	}
+	rootRoles := &rolesRepoMock{
+		getAllForUserFn: func(ctx context.Context, userID int64) (domain.Roles, error) {
+			t.Fatal("expected RefreshToken to use transaction roles repository")
+			return nil, nil
+		},
+	}
+
+	txUsers := &usersRepoMock{
+		getForTokenFn: func(ctx context.Context, scope domain.TokenScope, plaintext string) (*domain.User, error) {
+			return &domain.User{ID: 88, Password: domain.Password{Hash: []byte("hash")}}, nil
+		},
+	}
+	txTokens := &tokensRepoMock{
+		deleteAllFromUserFn: func(ctx context.Context, scope domain.TokenScope, userID int64) error {
+			return nil
+		},
+		newOpaqueTokenFn: func(ctx context.Context, userID int64, ttl time.Duration, scope domain.TokenScope) (*domain.OpaqueToken, error) {
+			return &domain.OpaqueToken{Plaintext: "rotated-refresh-token"}, nil
+		},
+	}
+	txRoles := &rolesRepoMock{
+		getAllForUserFn: func(ctx context.Context, userID int64) (domain.Roles, error) {
+			return domain.Roles{"user"}, nil
+		},
+	}
+	tx := &transactorMock{
+		repos: &repositorySetMock{
+			usersRepository:        txUsers,
+			opaqueTokensRepository: txTokens,
+			rolesRepository:        txRoles,
+		},
+	}
+
+	svc, err := New(Config{
+		UsersRepository:        rootUsers,
+		OpaqueTokensRepository: rootTokens,
+		RolesRepository:        rootRoles,
+		Transactor:             tx,
+		Issuer:                 "https://issuer.example",
+		JWTExpiration:          5 * time.Minute,
+		RefreshExpiration:      24 * time.Hour,
+		ActivationExpiration:   48 * time.Hour,
+	})
+	if err != nil {
+		t.Fatalf("setup failed creating identity service: %v", err)
+	}
+
+	refreshToken, accessToken, err := svc.RefreshToken(context.Background(), "old-refresh-token")
+	if err != nil {
+		t.Fatalf("expected nil error, got %v", err)
+	}
+	if refreshToken != "rotated-refresh-token" {
+		t.Fatalf("expected refresh token, got %q", refreshToken)
+	}
+	if accessToken == "" {
+		t.Fatal("expected access token")
+	}
+
+	if rootUsers.getForTokenCalls != 0 || rootRoles.getAllCalls != 0 ||
+		rootTokens.deleteCalls != 0 || len(rootTokens.newOpaqueTokenCalls) != 0 {
+		t.Fatal("expected root repositories not to be used inside RefreshToken transaction")
+	}
+	if txUsers.getForTokenCalls != 1 || txRoles.getAllCalls != 1 ||
+		txTokens.deleteCalls != 1 || len(txTokens.newOpaqueTokenCalls) != 1 {
+		t.Fatal("expected transaction repositories to handle RefreshToken operations")
 	}
 }
 
