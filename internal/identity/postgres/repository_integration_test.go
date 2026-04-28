@@ -43,6 +43,14 @@ func newPostgresIntegrationRepo(t *testing.T) (*sql.DB, *repository) {
 		t.Fatalf("ping postgres integration database: %v", err)
 	}
 
+	var usersTable sql.NullString
+	if err := db.QueryRowContext(ctx, `SELECT to_regclass('public.users')`).Scan(&usersTable); err != nil {
+		t.Fatalf("check postgres integration schema: %v", err)
+	}
+	if !usersTable.Valid {
+		t.Skipf("%s is set, but migrations are not applied; skipping Postgres integration test", postgresIntegrationDSNEnv)
+	}
+
 	return db, NewRepository(db, 3*time.Second)
 }
 
