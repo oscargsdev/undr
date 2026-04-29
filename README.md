@@ -101,3 +101,18 @@ Apply migrations manually before running repository integration tests:
 migrate -path=./migrations -database="$UNDR_REPOSITORY_TEST_DB_DSN" up
 go test ./internal/identity/postgres -run Integration -count=1
 ```
+
+## JWT Key Management
+
+The identity service currently generates an in-memory RSA signing key when the
+process starts. This is acceptable for the learning phase because it keeps local
+setup simple, but it is not production-ready:
+
+- restarting the service invalidates every existing access token
+- multiple service instances would not share the same signing key
+- there is no key rotation lifecycle
+- the key ID is static instead of being generated from persisted key metadata
+
+Before production, replace this with persisted signing keys, explicit key IDs,
+rotation support, and JWKS output that includes active public keys until all
+tokens signed by retired keys have expired.
