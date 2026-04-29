@@ -200,11 +200,6 @@ func (s *identityService) AuthenticateUser(ctx context.Context, email, password 
 		return "", "", mapRepositoryError(err)
 	}
 
-	roles, err := s.cfg.RolesRepository.GetAllRolesForUser(ctx, user.ID)
-	if err != nil {
-		return "", "", mapRepositoryError(err)
-	}
-
 	match, err := user.Password.Matches(password)
 	if err != nil {
 		return "", "", err
@@ -216,6 +211,11 @@ func (s *identityService) AuthenticateUser(ctx context.Context, email, password 
 
 	if !user.Activated {
 		return "", "", ErrUserNotActivated
+	}
+
+	roles, err := s.cfg.RolesRepository.GetAllRolesForUser(ctx, user.ID)
+	if err != nil {
+		return "", "", mapRepositoryError(err)
 	}
 
 	err = s.cfg.Transactor.WithinTx(ctx, func(repos RepositorySet) error {
