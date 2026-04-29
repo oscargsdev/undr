@@ -63,7 +63,7 @@ func main() {
 	defer db.Close()
 	logger.Info("database connection pool established")
 
-	identityCfg := identity.NewConfig(db, logger, identityFlags)
+	identityCfg := identity.NewConfig(db, logger, identityFlags, cfg.env)
 	identityModule, err := identity.New(identityCfg)
 	if err != nil {
 		logger.Error(err.Error())

@@ -18,6 +18,7 @@ type Module struct {
 type Config struct {
 	DB                   *sql.DB
 	Logger               *slog.Logger
+	EnableDemoRoutes     bool
 	Issuer               string
 	JWTExpiration        time.Duration
 	RefreshExpiration    time.Duration
@@ -25,10 +26,11 @@ type Config struct {
 	DBTimeout            time.Duration
 }
 
-func NewConfig(db *sql.DB, logger *slog.Logger, flagConfig FlagConfig) Config {
+func NewConfig(db *sql.DB, logger *slog.Logger, flagConfig FlagConfig, env string) Config {
 	return Config{
 		DB:                   db,
 		Logger:               logger,
+		EnableDemoRoutes:     env != "production",
 		Issuer:               flagConfig.Issuer,
 		JWTExpiration:        time.Duration(flagConfig.JWTExpiration) * time.Minute,
 		RefreshExpiration:    time.Duration(flagConfig.RefreshExpiration) * time.Hour,
@@ -66,6 +68,8 @@ func New(cfg Config) (*Module, error) {
 		return nil, err
 	}
 
-	module.Router = api.NewRouter(svc, cfg.Logger)
+	module.Router = api.NewRouter(svc, cfg.Logger, api.RouterConfig{
+		EnableDemoRoutes: cfg.EnableDemoRoutes,
+	})
 	return module, nil
 }

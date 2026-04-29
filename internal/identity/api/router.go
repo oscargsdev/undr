@@ -5,7 +5,11 @@ import (
 	"net/http"
 )
 
-func NewRouter(svc IdentityService, logger *slog.Logger) http.Handler {
+type RouterConfig struct {
+	EnableDemoRoutes bool
+}
+
+func NewRouter(svc IdentityService, logger *slog.Logger, cfg RouterConfig) http.Handler {
 	handler := newHandler(svc, logger)
 	mux := http.NewServeMux()
 
@@ -14,10 +18,12 @@ func NewRouter(svc IdentityService, logger *slog.Logger) http.Handler {
 	mux.HandleFunc("POST /authenticate", handler.authenticateUserHandler)
 	mux.HandleFunc("POST /refresh", handler.refreshTokenHandler)
 	mux.Handle("POST /logout", handler.authorizationMiddleware(http.HandlerFunc(handler.logoutHandler)))
-
-	mux.Handle("GET /secured", handler.authorizationMiddleware(http.HandlerFunc(handler.testSecuredEndpoint)))
-	mux.Handle("GET /admin-portal", handler.requireRoleMiddleware("admin", http.HandlerFunc(handler.onlyAdminsHandler)))
 	mux.Handle("GET /users/{userId}", handler.authorizationMiddleware(http.HandlerFunc(handler.myInfoHandler)))
+
+	if cfg.EnableDemoRoutes {
+		mux.Handle("GET /secured", handler.authorizationMiddleware(http.HandlerFunc(handler.testSecuredEndpoint)))
+		mux.Handle("GET /admin-portal", handler.requireRoleMiddleware("admin", http.HandlerFunc(handler.onlyAdminsHandler)))
+	}
 
 	mux.HandleFunc("GET /jwks.json", handler.jwksHandler)
 
