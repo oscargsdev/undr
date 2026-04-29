@@ -13,4 +13,5 @@ CREATE TABLE IF NOT EXISTS users_roles (
 INSERT INTO roles (code)
 VALUES 
     ('user'),
-    ('admin');
+    ('admin')
+ON CONFLICT (code) DO NOTHING;
