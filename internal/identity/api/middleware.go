@@ -56,11 +56,18 @@ func (h *handler) requireRoleMiddleware(code string, next http.Handler) http.Han
 	fn := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		roles, err := service.ContextGetRoles(r)
 		if err != nil {
+			h.logWarn(r, "identity authorization context missing roles")
 			h.responder.AuthenticationRequiredResponse(w, r)
 			return
 		}
 
 		if !slices.Contains(roles, code) {
+			userID, err := service.ContextGetUserId(r)
+			if err != nil {
+				h.logWarn(r, "identity authorization context missing user id", "required_role", code)
+			} else {
+				h.logWarn(r, "identity authorization rejected", "user_id", userID, "required_role", code)
+			}
 			h.responder.NotPermittedResponse(w, r)
 			return
 		}

@@ -61,6 +61,11 @@ func (h *handler) logError(r *http.Request, err error) {
 	h.logger.Error(err.Error(), "method", r.Method, "uri", r.URL.RequestURI())
 }
 
+func (h *handler) logWarn(r *http.Request, msg string, args ...any) {
+	args = append(args, "method", r.Method, "uri", r.URL.RequestURI())
+	h.logger.Warn(msg, args...)
+}
+
 func (h *handler) registerUserHandler(w http.ResponseWriter, r *http.Request) {
 	var input struct {
 		Username string `json:"username"`

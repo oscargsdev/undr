@@ -112,6 +112,30 @@ func requireRoles(roles domain.Roles, err error) (domain.Roles, error) {
 	return roles, nil
 }
 
+func (s *identityService) logInfo(ctx context.Context, msg string, args ...any) {
+	if s.cfg.Logger != nil {
+		s.cfg.Logger.InfoContext(ctx, msg, args...)
+	}
+}
+
+func (s *identityService) logWarn(ctx context.Context, msg string, args ...any) {
+	if s.cfg.Logger != nil {
+		s.cfg.Logger.WarnContext(ctx, msg, args...)
+	}
+}
+
+func (s *identityService) logError(ctx context.Context, msg string, args ...any) {
+	if s.cfg.Logger != nil {
+		s.cfg.Logger.ErrorContext(ctx, msg, args...)
+	}
+}
+
+func (s *identityService) logNoRoles(ctx context.Context, userID int64, operation string, err error) {
+	if errors.Is(err, ErrUserWithoutRoles) {
+		s.logWarn(ctx, "identity user has no roles", "user_id", userID, "operation", operation)
+	}
+}
+
 func New(cfg Config) (*identityService, error) {
 	identityService := &identityService{
 		cfg: cfg,
@@ -154,6 +178,7 @@ func (s *identityService) RegisterUser(ctx context.Context, user *domain.User) (
 	}
 
 	// EVENT: userRegistered
+	s.logInfo(ctx, "identity user registered", "user_id", user.ID)
 	return activationToken, nil
 }
 
@@ -169,6 +194,7 @@ func (s *identityService) ActivateUser(ctx context.Context, tokenPlainText strin
 
 		roles, err = requireRoles(repos.GetAllRolesForUser(ctx, user.ID))
 		if err != nil {
+			s.logNoRoles(ctx, user.ID, "activate_user", err)
 			return err
 		}
 
@@ -202,6 +228,7 @@ func (s *identityService) ActivateUser(ctx context.Context, tokenPlainText strin
 	}
 
 	// EVENT: userActivated
+	s.logInfo(ctx, "identity user activated", "user_id", user.ID)
 	return
 }
 
@@ -217,15 +244,18 @@ func (s *identityService) AuthenticateUser(ctx context.Context, email, password 
 	}
 
 	if !match {
+		s.logInfo(ctx, "identity authentication rejected", "user_id", user.ID, "reason", "invalid_credentials")
 		return "", "", ErrInvalidCredentials
 	}
 
 	if !user.Activated {
+		s.logInfo(ctx, "identity authentication rejected", "user_id", user.ID, "reason", "inactive_account")
 		return "", "", ErrUserNotActivated
 	}
 
 	roles, err := requireRoles(s.cfg.RolesRepository.GetAllRolesForUser(ctx, user.ID))
 	if err != nil {
+		s.logNoRoles(ctx, user.ID, "authenticate_user", err)
 		return "", "", err
 	}
 
@@ -253,6 +283,7 @@ func (s *identityService) AuthenticateUser(ctx context.Context, email, password 
 	}
 
 	// EVENT: userAuthenticated
+	s.logInfo(ctx, "identity user authenticated", "user_id", user.ID)
 	return
 }
 
@@ -268,6 +299,7 @@ func (s *identityService) RefreshToken(ctx context.Context, oldRefreshToken stri
 
 		roles, err = requireRoles(repos.GetAllRolesForUser(ctx, user.ID))
 		if err != nil {
+			s.logNoRoles(ctx, user.ID, "refresh_token", err)
 			return err
 		}
 
@@ -293,12 +325,18 @@ func (s *identityService) RefreshToken(ctx context.Context, oldRefreshToken stri
 		return "", "", err
 	}
 
+	s.logInfo(ctx, "identity refresh token rotated", "user_id", user.ID)
 	return
 }
 
 func (s *identityService) Logout(ctx context.Context, userId int64) error {
 	err := s.cfg.OpaqueTokensRepository.DeleteAllFromUser(ctx, domain.ScopeRefresh, userId)
-	return mapRepositoryError(err)
+	if err != nil {
+		return mapRepositoryError(err)
+	}
+
+	s.logInfo(ctx, "identity user logged out", "user_id", userId)
+	return nil
 }
 
 func (s *identityService) GetUserById(ctx context.Context, userId int64) (*domain.UserDetails, error) {
@@ -309,6 +347,7 @@ func (s *identityService) GetUserById(ctx context.Context, userId int64) (*domai
 
 	roles, err := requireRoles(s.cfg.RolesRepository.GetAllRolesForUser(ctx, user.ID))
 	if err != nil {
+		s.logNoRoles(ctx, user.ID, "get_user_by_id", err)
 		return nil, err
 	}
 
@@ -345,7 +384,7 @@ func (s *identityService) initJWKS() (*rsa.PrivateKey, jwkset.Storage, error) {
 
 	privateKey, err := rsa.GenerateKey(rand.Reader, 2048)
 	if err != nil {
-		s.cfg.Logger.Error("failed to generate RSA key")
+		s.logError(ctx, "failed to generate RSA key")
 		return nil, nil, err
 	}
 
@@ -358,13 +397,13 @@ func (s *identityService) initJWKS() (*rsa.PrivateKey, jwkset.Storage, error) {
 
 	jwk, err := jwkset.NewJWKFromKey(privateKey, options)
 	if err != nil {
-		s.cfg.Logger.Error("failed to create JWK from key")
+		s.logError(ctx, "failed to create JWK from key")
 		return nil, nil, err
 	}
 
 	err = jwkStore.KeyWrite(ctx, jwk)
 	if err != nil {
-		s.cfg.Logger.Error("failed to store RSA key")
+		s.logError(ctx, "failed to store RSA key")
 		return nil, nil, err
 	}
 
