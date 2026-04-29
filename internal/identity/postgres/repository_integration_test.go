@@ -221,6 +221,10 @@ func TestIntegrationRepositoryOpaqueTokenLookupScopeExpiryAndDeletion(t *testing
 		t.Fatalf("expected expired token to map to record not found, got %v", err)
 	}
 
+	if _, err := repo.NewOpaqueToken(ctx, user.ID, time.Hour, domain.TokenScope("invalid")); err == nil {
+		t.Fatal("expected invalid token scope to fail")
+	}
+
 	if err := repo.DeleteAllFromUser(ctx, domain.ScopeRefresh, user.ID); err != nil {
 		t.Fatalf("delete refresh tokens: %v", err)
 	}

@@ -1,6 +1,6 @@
 CREATE TABLE IF NOT EXISTS roles (
     id bigserial PRIMARY KEY,
-    code text NOT NULL
+    code text UNIQUE NOT NULL
 );
 
 CREATE TABLE IF NOT EXISTS users_roles (
