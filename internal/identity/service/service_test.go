@@ -563,6 +563,7 @@ func TestIdentityService_ActivateUser(t *testing.T) {
 		name              string
 		getUserErr        error
 		getRolesErr       error
+		noRoles           bool
 		updateErr         error
 		deleteErr         error
 		newTokenErr       error
@@ -595,6 +596,13 @@ func TestIdentityService_ActivateUser(t *testing.T) {
 			name:              "get roles error mapped",
 			getRolesErr:       store.ErrRecordNotFound,
 			wantErr:           ErrRecordNotFound,
+			wantGetUserCalls:  1,
+			wantGetRolesCalls: 1,
+		},
+		{
+			name:              "no roles returns user without roles error",
+			noRoles:           true,
+			wantErr:           ErrUserWithoutRoles,
 			wantGetUserCalls:  1,
 			wantGetRolesCalls: 1,
 		},
@@ -642,6 +650,9 @@ func TestIdentityService_ActivateUser(t *testing.T) {
 			roles.getAllForUserFn = func(ctx context.Context, userID int64) (domain.Roles, error) {
 				if tt.getRolesErr != nil {
 					return nil, tt.getRolesErr
+				}
+				if tt.noRoles {
+					return nil, nil
 				}
 				return domain.Roles{"user", "admin"}, nil
 			}
@@ -813,6 +824,7 @@ func TestIdentityService_AuthenticateUser(t *testing.T) {
 		password          string
 		getUserErr        error
 		getRolesErr       error
+		noRoles           bool
 		deleteErr         error
 		newTokenErr       error
 		wantErr           error
@@ -851,6 +863,15 @@ func TestIdentityService_AuthenticateUser(t *testing.T) {
 			password:          "correct-password",
 			getRolesErr:       store.ErrRecordNotFound,
 			wantErr:           ErrRecordNotFound,
+			wantGetUserCalls:  1,
+			wantGetRolesCalls: 1,
+		},
+		{
+			name:              "no roles returns user without roles error",
+			user:              validUser,
+			password:          "correct-password",
+			noRoles:           true,
+			wantErr:           ErrUserWithoutRoles,
 			wantGetUserCalls:  1,
 			wantGetRolesCalls: 1,
 		},
@@ -914,6 +935,9 @@ func TestIdentityService_AuthenticateUser(t *testing.T) {
 			roles.getAllForUserFn = func(ctx context.Context, userID int64) (domain.Roles, error) {
 				if tt.getRolesErr != nil {
 					return nil, tt.getRolesErr
+				}
+				if tt.noRoles {
+					return nil, nil
 				}
 				return domain.Roles{"user"}, nil
 			}
@@ -1052,6 +1076,7 @@ func TestIdentityService_RefreshToken(t *testing.T) {
 		name              string
 		getUserErr        error
 		getRolesErr       error
+		noRoles           bool
 		deleteErr         error
 		newTokenErr       error
 		wantErr           error
@@ -1084,6 +1109,14 @@ func TestIdentityService_RefreshToken(t *testing.T) {
 			name:              "get roles error mapped",
 			getRolesErr:       store.ErrRecordNotFound,
 			wantErr:           ErrRecordNotFound,
+			wantGetUserCalls:  1,
+			wantGetRolesCalls: 1,
+			wantTxCalls:       1,
+		},
+		{
+			name:              "no roles returns user without roles error",
+			noRoles:           true,
+			wantErr:           ErrUserWithoutRoles,
 			wantGetUserCalls:  1,
 			wantGetRolesCalls: 1,
 			wantTxCalls:       1,
@@ -1122,6 +1155,9 @@ func TestIdentityService_RefreshToken(t *testing.T) {
 			roles.getAllForUserFn = func(ctx context.Context, userID int64) (domain.Roles, error) {
 				if tt.getRolesErr != nil {
 					return nil, tt.getRolesErr
+				}
+				if tt.noRoles {
+					return nil, nil
 				}
 				return domain.Roles{"user"}, nil
 			}
@@ -1261,10 +1297,13 @@ func TestIdentityService_RefreshTokenUsesTransactionRepositorySet(t *testing.T) 
 }
 
 func TestIdentityService_GetUserByID(t *testing.T) {
+	rolesErr := errors.New("roles fail")
+
 	tests := []struct {
 		name              string
 		getUserErr        error
 		getRolesErr       error
+		noRoles           bool
 		wantErr           error
 		wantGetUserCalls  int
 		wantGetRolesCalls int
@@ -1281,8 +1320,15 @@ func TestIdentityService_GetUserByID(t *testing.T) {
 			wantGetUserCalls: 1,
 		},
 		{
-			name:              "get roles error returns ErrUserWithoutRoles",
-			getRolesErr:       errors.New("roles fail"),
+			name:              "get roles error returned",
+			getRolesErr:       rolesErr,
+			wantErr:           rolesErr,
+			wantGetUserCalls:  1,
+			wantGetRolesCalls: 1,
+		},
+		{
+			name:              "no roles returns ErrUserWithoutRoles",
+			noRoles:           true,
 			wantErr:           ErrUserWithoutRoles,
 			wantGetUserCalls:  1,
 			wantGetRolesCalls: 1,
@@ -1302,6 +1348,9 @@ func TestIdentityService_GetUserByID(t *testing.T) {
 			roles.getAllForUserFn = func(ctx context.Context, userID int64) (domain.Roles, error) {
 				if tt.getRolesErr != nil {
 					return nil, tt.getRolesErr
+				}
+				if tt.noRoles {
+					return nil, nil
 				}
 				return domain.Roles{"user", "admin"}, nil
 			}

@@ -101,6 +101,17 @@ func mapRepositoryError(err error) error {
 	}
 }
 
+func requireRoles(roles domain.Roles, err error) (domain.Roles, error) {
+	if err != nil {
+		return nil, mapRepositoryError(err)
+	}
+	if len(roles) == 0 {
+		return nil, ErrUserWithoutRoles
+	}
+
+	return roles, nil
+}
+
 func New(cfg Config) (*identityService, error) {
 	identityService := &identityService{
 		cfg: cfg,
@@ -156,7 +167,7 @@ func (s *identityService) ActivateUser(ctx context.Context, tokenPlainText strin
 			return err
 		}
 
-		roles, err = repos.GetAllRolesForUser(ctx, user.ID)
+		roles, err = requireRoles(repos.GetAllRolesForUser(ctx, user.ID))
 		if err != nil {
 			return err
 		}
@@ -213,9 +224,9 @@ func (s *identityService) AuthenticateUser(ctx context.Context, email, password 
 		return "", "", ErrUserNotActivated
 	}
 
-	roles, err := s.cfg.RolesRepository.GetAllRolesForUser(ctx, user.ID)
+	roles, err := requireRoles(s.cfg.RolesRepository.GetAllRolesForUser(ctx, user.ID))
 	if err != nil {
-		return "", "", mapRepositoryError(err)
+		return "", "", err
 	}
 
 	err = s.cfg.Transactor.WithinTx(ctx, func(repos RepositorySet) error {
@@ -255,7 +266,7 @@ func (s *identityService) RefreshToken(ctx context.Context, oldRefreshToken stri
 			return err
 		}
 
-		roles, err = repos.GetAllRolesForUser(ctx, user.ID)
+		roles, err = requireRoles(repos.GetAllRolesForUser(ctx, user.ID))
 		if err != nil {
 			return err
 		}
@@ -296,9 +307,9 @@ func (s *identityService) GetUserById(ctx context.Context, userId int64) (*domai
 		return nil, mapRepositoryError(err)
 	}
 
-	roles, err := s.cfg.RolesRepository.GetAllRolesForUser(ctx, user.ID)
+	roles, err := requireRoles(s.cfg.RolesRepository.GetAllRolesForUser(ctx, user.ID))
 	if err != nil {
-		return nil, ErrUserWithoutRoles
+		return nil, err
 	}
 
 	userDetails := domain.UserDetails{
