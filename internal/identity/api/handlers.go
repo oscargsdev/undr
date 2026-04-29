@@ -26,6 +26,7 @@ type IdentityService interface {
 	RefreshToken(context.Context, string) (refreshTokenString string, accessTokenString string, err error)
 	Logout(context.Context, int64) error
 	GetIssuer() string
+	GetRefreshExpiration() time.Duration
 	GetJWKS(r *http.Request) (json.RawMessage, error)
 	ValidateJWTToken(tokenString string, issuer string) (*jwt.Token, error)
 }
@@ -149,7 +150,7 @@ func (h *handler) activateUserHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	http.SetCookie(w, newRefreshTokenCookie(refreshToken, time.Now().Add(24*time.Hour)))
+	http.SetCookie(w, newRefreshTokenCookie(refreshToken, time.Now().Add(h.service.GetRefreshExpiration())))
 
 	err = jsonx.WriteJSON(w, http.StatusOK, jsonx.Envelope{"access_token": accessToken}, nil)
 	if err != nil {
@@ -216,7 +217,7 @@ func (h *handler) authenticateUserHandler(w http.ResponseWriter, r *http.Request
 		return
 	}
 
-	http.SetCookie(w, newRefreshTokenCookie(refreshToken, time.Now().Add(24*time.Hour)))
+	http.SetCookie(w, newRefreshTokenCookie(refreshToken, time.Now().Add(h.service.GetRefreshExpiration())))
 
 	err = jsonx.WriteJSON(w, http.StatusOK, jsonx.Envelope{"access_token": accessToken}, nil)
 	if err != nil {
@@ -253,7 +254,7 @@ func (h *handler) refreshTokenHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	http.SetCookie(w, newRefreshTokenCookie(refreshToken, time.Now().Add(24*time.Hour)))
+	http.SetCookie(w, newRefreshTokenCookie(refreshToken, time.Now().Add(h.service.GetRefreshExpiration())))
 
 	err = jsonx.WriteJSON(w, http.StatusOK, jsonx.Envelope{"access_token": accessToken}, nil)
 	if err != nil {

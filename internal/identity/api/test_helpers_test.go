@@ -25,6 +25,7 @@ type mockIdentityService struct {
 	refreshTokenFn     func(ctx context.Context, oldRefreshToken string) (string, string, error)
 	logoutFn           func(ctx context.Context, userID int64) error
 	getIssuerFn        func() string
+	getRefreshExpiryFn func() time.Duration
 	getJWKSFn          func(r *http.Request) (json.RawMessage, error)
 	validateJWTTokenFn func(tokenString string, issuer string) (*jwt.Token, error)
 
@@ -35,6 +36,7 @@ type mockIdentityService struct {
 	refreshTokenCalls     int
 	logoutCalls           int
 	getIssuerCalls        int
+	getRefreshExpiryCalls int
 	getJWKSCalls          int
 	validateJWTTokenCalls int
 
@@ -101,6 +103,14 @@ func (m *mockIdentityService) GetIssuer() string {
 		panic("unexpected GetIssuer call")
 	}
 	return m.getIssuerFn()
+}
+
+func (m *mockIdentityService) GetRefreshExpiration() time.Duration {
+	m.getRefreshExpiryCalls++
+	if m.getRefreshExpiryFn != nil {
+		return m.getRefreshExpiryFn()
+	}
+	return 24 * time.Hour
 }
 
 func (m *mockIdentityService) GetJWKS(r *http.Request) (json.RawMessage, error) {

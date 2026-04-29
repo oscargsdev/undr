@@ -214,6 +214,66 @@ func TestHandler_RegisterUserHandlerPassesRequestContext(t *testing.T) {
 	}
 }
 
+func TestHandler_RefreshCookieUsesConfiguredExpiration(t *testing.T) {
+	tests := []struct {
+		name     string
+		exercise func(*handler, *httptest.ResponseRecorder)
+	}{
+		{
+			name: "activation",
+			exercise: func(handler *handler, rr *httptest.ResponseRecorder) {
+				req := httptest.NewRequest(http.MethodPut, "/activate", strings.NewReader(`{"activationToken":"`+strings.Repeat("a", 26)+`"}`))
+				handler.activateUserHandler(rr, req)
+			},
+		},
+		{
+			name: "authentication",
+			exercise: func(handler *handler, rr *httptest.ResponseRecorder) {
+				req := httptest.NewRequest(http.MethodPost, "/authenticate", strings.NewReader(`{"email":"alice@example.com","password":"super-secure"}`))
+				handler.authenticateUserHandler(rr, req)
+			},
+		},
+		{
+			name: "refresh",
+			exercise: func(handler *handler, rr *httptest.ResponseRecorder) {
+				req := httptest.NewRequest(http.MethodPost, "/refresh", nil)
+				req.AddCookie(&http.Cookie{Name: "refresh_token", Value: strings.Repeat("r", 26)})
+				handler.refreshTokenHandler(rr, req)
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			svc := &mockIdentityService{
+				activateUserFn: func(ctx context.Context, tokenPlainText string) (string, string, error) {
+					return "refresh", "access", nil
+				},
+				authenticateUserFn: func(ctx context.Context, email, password string) (string, string, error) {
+					return "refresh", "access", nil
+				},
+				refreshTokenFn: func(ctx context.Context, oldRefreshToken string) (string, string, error) {
+					return "refresh", "access", nil
+				},
+				getRefreshExpiryFn: func() time.Duration {
+					return 2 * time.Hour
+				},
+			}
+			handler := newTestHandler(svc)
+			rr := httptest.NewRecorder()
+
+			tt.exercise(handler, rr)
+
+			assertStatus(t, rr, http.StatusOK)
+			cookie := cookieByName(t, rr, "refresh_token")
+			remaining := time.Until(cookie.Expires)
+			if remaining < 119*time.Minute || remaining > 2*time.Hour {
+				t.Fatalf("expected refresh cookie expiry to be about 2 hours from now, got %v", cookie.Expires)
+			}
+		})
+	}
+}
+
 func TestHandler_ActivateUserHandler(t *testing.T) {
 	tests := []struct {
 		name       string

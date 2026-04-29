@@ -324,6 +324,10 @@ func (s *identityService) GetIssuer() string {
 	return s.cfg.Issuer
 }
 
+func (s *identityService) GetRefreshExpiration() time.Duration {
+	return s.cfg.RefreshExpiration
+}
+
 var ErrJWKJSON = errors.New("failed to get JWK Set JSON")
 
 func (s *identityService) GetJWKS(r *http.Request) (json.RawMessage, error) {
