@@ -1,0 +1,749 @@
+openapi: 3.0.3
+info:
+  title: undr Identity API
+  version: 0.1.0
+  description: |
+    OpenAPI specification for the current `undr` HTTP API surface.
+
+    The server mounts the identity module under `/v1/identity`.
+
+    `GET /v1/identity/secured` and `GET /v1/identity/admin-portal` are demo
+    routes. They are available in non-production environments and are disabled
+    when the server runs with `-env production`.
+servers:
+  - url: http://localhost:4000
+    description: Default local development server
+tags:
+  - name: Identity
+    description: User registration, activation, authentication, and session flows
+  - name: Demo
+    description: Non-production routes enabled outside `-env production`
+paths:
+  /v1/identity/register:
+    post:
+      tags:
+        - Identity
+      summary: Register a new user
+      description: |
+        Creates an inactive user, assigns the default `user` role, and returns a
+        single-use activation token. The activation token is returned in the
+        response for the current learning/local-development flow.
+      operationId: registerUser
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RegisterRequest'
+            examples:
+              default:
+                value:
+                  username: alice
+                  email: alice@example.com
+                  password: super-secure
+      responses:
+        '202':
+          description: User registered and activation token issued
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RegisterResponse'
+              examples:
+                default:
+                  value:
+                    user:
+                      id: 12
+                      created_at: '2026-04-28T20:15:00Z'
+                      username: alice
+                      email: alice@example.com
+                      activated: false
+                    activation_token: abcdefghijklmnopqrstuvwxyz
+        '400':
+          description: Malformed or otherwise invalid JSON request body
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorString'
+              examples:
+                malformedJson:
+                  value:
+                    error: body contains badly-formed JSON
+        '422':
+          description: Validation failed or username/email already exists
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorMap'
+              examples:
+                validation:
+                  value:
+                    error:
+                      email: must be a valid email address
+                      password: must be at least 8 bytes long
+                      username: must be provided
+                duplicateEmail:
+                  value:
+                    error:
+                      email: a user with this email address already exists
+                duplicateUsername:
+                  value:
+                    error:
+                      username: a user with this username already exists
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+  /v1/identity/activate:
+    put:
+      tags:
+        - Identity
+      summary: Activate a user account
+      description: |
+        Activates a registered user, returns a JWT access token, and sets a
+        `refresh_token` cookie scoped to `/v1/identity/refresh`.
+      operationId: activateUser
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ActivateRequest'
+            examples:
+              default:
+                value:
+                  activationToken: abcdefghijklmnopqrstuvwxyz
+      responses:
+        '200':
+          description: User activated and session established
+          headers:
+            Set-Cookie:
+              $ref: '#/components/headers/RefreshTokenCookie'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AccessTokenResponse'
+              examples:
+                default:
+                  value:
+                    access_token: eyJhbGciOiJSUzI1NiJ9...
+        '400':
+          description: Malformed or otherwise invalid JSON request body
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorString'
+              examples:
+                malformedJson:
+                  value:
+                    error: body contains badly-formed JSON
+        '409':
+          description: Concurrent activation conflict
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorString'
+              examples:
+                editConflict:
+                  value:
+                    error: unable to update the record due to an edit conflict, please try again
+        '422':
+          description: Invalid activation token format or token cannot be used
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorMap'
+              examples:
+                invalidFormat:
+                  value:
+                    error:
+                      token: must be 26 bytes long
+                invalidOrExpired:
+                  value:
+                    error:
+                      token: invalid or expired activation token
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+  /v1/identity/authenticate:
+    post:
+      tags:
+        - Identity
+      summary: Authenticate an activated user
+      description: |
+        Validates credentials for an activated user, returns a JWT access token,
+        and sets a `refresh_token` cookie scoped to `/v1/identity/refresh`.
+      operationId: authenticateUser
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AuthenticateRequest'
+            examples:
+              default:
+                value:
+                  email: alice@example.com
+                  password: super-secure
+      responses:
+        '200':
+          description: Credentials accepted and session established
+          headers:
+            Set-Cookie:
+              $ref: '#/components/headers/RefreshTokenCookie'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AccessTokenResponse'
+              examples:
+                default:
+                  value:
+                    access_token: eyJhbGciOiJSUzI1NiJ9...
+        '400':
+          description: Malformed or otherwise invalid JSON request body
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorString'
+              examples:
+                malformedJson:
+                  value:
+                    error: body contains badly-formed JSON
+        '401':
+          description: Email/password combination was rejected
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorString'
+              examples:
+                invalidCredentials:
+                  value:
+                    error: invalid authentication credentials
+        '403':
+          description: User exists but has not been activated yet
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorString'
+              examples:
+                inactiveAccount:
+                  value:
+                    error: your user account must be activated to access this resource
+        '422':
+          description: Request validation failed
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorMap'
+              examples:
+                validation:
+                  value:
+                    error:
+                      email: must be a valid email address
+                      password: must be at least 8 bytes long
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+  /v1/identity/refresh:
+    post:
+      tags:
+        - Identity
+      summary: Rotate a refresh token and mint a new access token
+      description: |
+        Reads the `refresh_token` cookie, rotates it, and returns a new JWT
+        access token.
+      operationId: refreshToken
+      security:
+        - refreshTokenCookie: []
+      responses:
+        '200':
+          description: Refresh token rotated and access token issued
+          headers:
+            Set-Cookie:
+              $ref: '#/components/headers/RefreshTokenCookie'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AccessTokenResponse'
+              examples:
+                default:
+                  value:
+                    access_token: eyJhbGciOiJSUzI1NiJ9...
+        '400':
+          description: Missing cookie, invalid token format, or invalid/expired refresh token
+          content:
+            application/json:
+              schema:
+                oneOf:
+                  - $ref: '#/components/schemas/ErrorString'
+                  - $ref: '#/components/schemas/ErrorMap'
+              examples:
+                missingCookie:
+                  value:
+                    error: named cookie not present
+                invalidFormat:
+                  value:
+                    error:
+                      token: must be 26 bytes long
+                invalidOrExpired:
+                  value:
+                    error: invalid or expired refresh token
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+  /v1/identity/logout:
+    post:
+      tags:
+        - Identity
+      summary: Revoke refresh tokens for the authenticated user
+      description: |
+        Deletes the authenticated user's refresh tokens server-side and clears the
+        client `refresh_token` cookie.
+      operationId: logoutUser
+      security:
+        - bearerAuth: []
+      responses:
+        '204':
+          description: Logged out and refresh cookie cleared
+          headers:
+            Set-Cookie:
+              description: Expired `refresh_token` cookie cleared with `Path=/v1/identity/refresh`.
+              schema:
+                type: string
+        '400':
+          description: Access token is malformed
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorString'
+              examples:
+                malformedToken:
+                  value:
+                    error: malformed access token
+        '401':
+          $ref: '#/components/responses/InvalidAccessToken'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+  /v1/identity/users/{userId}:
+    get:
+      tags:
+        - Identity
+      summary: Fetch the authenticated user's details
+      description: |
+        Returns the user identified by the path parameter, but only when the
+        authenticated JWT subject matches that same `userId`.
+      operationId: getMyUserDetails
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: userId
+          in: path
+          required: true
+          description: The authenticated user's numeric identifier
+          schema:
+            type: integer
+            format: int64
+            minimum: 1
+      responses:
+        '200':
+          description: User details returned
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserDetailsResponse'
+              examples:
+                default:
+                  value:
+                    user_details:
+                      id: 12
+                      created_at: '2026-04-28T20:15:00Z'
+                      username: alice
+                      email: alice@example.com
+                      activated: true
+                      roles:
+                        - user
+        '400':
+          description: Path parameter is not a valid integer or access token is malformed
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorString'
+              examples:
+                invalidPath:
+                  value:
+                    error: 'strconv.ParseInt: parsing "abc": invalid syntax'
+                malformedToken:
+                  value:
+                    error: malformed access token
+        '401':
+          description: Missing/invalid access token or authenticated user does not own the requested resource
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorString'
+              examples:
+                invalidAccessToken:
+                  value:
+                    error: invalid or missing access token
+                crossUserAccess:
+                  value:
+                    error: invalid authentication credentials
+        '404':
+          description: User record does not exist
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorString'
+              examples:
+                notFound:
+                  value:
+                    error: the requested resource could not be found
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+  /v1/identity/jwks.json:
+    get:
+      tags:
+        - Identity
+      summary: Fetch the public JWKS document
+      description: Returns the public signing keys used to validate JWT access tokens.
+      operationId: getJwks
+      responses:
+        '200':
+          description: Current JWKS document
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/JWKSResponse'
+              examples:
+                default:
+                  value:
+                    jwks:
+                      keys:
+                        - kid: my-key-id
+                          kty: RSA
+                          alg: RS256
+                          use: sig
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+  /v1/identity/secured:
+    get:
+      tags:
+        - Demo
+      summary: Demo bearer-protected route
+      description: |
+        Non-production demo route. Returns the authenticated user ID and roles
+        derived from the bearer token.
+      operationId: getSecuredDemoPayload
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Authenticated demo payload returned
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SecuredResponse'
+              examples:
+                default:
+                  value:
+                    userId: 12
+                    roles:
+                      - user
+                      - admin
+        '400':
+          description: Access token is malformed
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorString'
+              examples:
+                malformedToken:
+                  value:
+                    error: malformed access token
+        '401':
+          $ref: '#/components/responses/InvalidAccessToken'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+  /v1/identity/admin-portal:
+    get:
+      tags:
+        - Demo
+      summary: Demo admin-only route
+      description: |
+        Non-production demo route. Requires a valid bearer token containing the
+        `admin` role.
+      operationId: getAdminPortalDemoPayload
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Admin-only demo payload returned
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AdminPortalResponse'
+              examples:
+                default:
+                  value:
+                    howdy: you are an admin!
+        '400':
+          description: Access token is malformed
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorString'
+              examples:
+                malformedToken:
+                  value:
+                    error: malformed access token
+        '401':
+          $ref: '#/components/responses/InvalidAccessToken'
+        '403':
+          description: Authenticated user lacks the required role
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorString'
+              examples:
+                notPermitted:
+                  value:
+                    error: your user account does not have the necessary roles/permissions to access this resource
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: "JWT access token presented as `Authorization: Bearer <token>`"
+    refreshTokenCookie:
+      type: apiKey
+      in: cookie
+      name: refresh_token
+      description: |
+        Opaque refresh token cookie. The server sets it with `Path=/v1/identity/refresh`,
+        `HttpOnly`, `Secure`, and `SameSite=Strict`.
+  headers:
+    BearerAuthenticate:
+      description: Bearer challenge header set on invalid or missing access tokens
+      schema:
+        type: string
+        example: Bearer
+    RefreshTokenCookie:
+      description: |
+        `refresh_token` cookie. The server sets `Path=/v1/identity/refresh`,
+        `HttpOnly`, `Secure`, `SameSite=Strict`, and an expiry based on the
+        configured refresh-token lifetime.
+      schema:
+        type: string
+  responses:
+    InternalServerError:
+      description: Unexpected server-side failure
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorString'
+          examples:
+            default:
+              value:
+                error: the server encountered an error and could not process your request
+    InvalidAccessToken:
+      description: Missing or invalid bearer token
+      headers:
+        WWW-Authenticate:
+          $ref: '#/components/headers/BearerAuthenticate'
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorString'
+          examples:
+            default:
+              value:
+                error: invalid or missing access token
+  schemas:
+    RegisterRequest:
+      type: object
+      additionalProperties: false
+      required:
+        - username
+        - email
+        - password
+      properties:
+        username:
+          type: string
+          maxLength: 500
+          example: alice
+        email:
+          type: string
+          format: email
+          example: alice@example.com
+        password:
+          type: string
+          minLength: 8
+          maxLength: 72
+          example: super-secure
+    ActivateRequest:
+      type: object
+      additionalProperties: false
+      required:
+        - activationToken
+      properties:
+        activationToken:
+          $ref: '#/components/schemas/OpaqueToken'
+    AuthenticateRequest:
+      type: object
+      additionalProperties: false
+      required:
+        - email
+        - password
+      properties:
+        email:
+          type: string
+          format: email
+          example: alice@example.com
+        password:
+          type: string
+          minLength: 8
+          maxLength: 72
+          example: super-secure
+    User:
+      type: object
+      required:
+        - id
+        - created_at
+        - username
+        - email
+        - activated
+      properties:
+        id:
+          type: integer
+          format: int64
+          example: 12
+        created_at:
+          type: string
+          format: date-time
+          example: '2026-04-28T20:15:00Z'
+        username:
+          type: string
+          example: alice
+        email:
+          type: string
+          format: email
+          example: alice@example.com
+        activated:
+          type: boolean
+          example: true
+    UserDetails:
+      allOf:
+        - $ref: '#/components/schemas/User'
+        - type: object
+          required:
+            - roles
+          properties:
+            roles:
+              type: array
+              items:
+                type: string
+              example:
+                - user
+                - admin
+    RegisterResponse:
+      type: object
+      required:
+        - user
+        - activation_token
+      properties:
+        user:
+          $ref: '#/components/schemas/User'
+        activation_token:
+          $ref: '#/components/schemas/OpaqueToken'
+    AccessTokenResponse:
+      type: object
+      required:
+        - access_token
+      properties:
+        access_token:
+          type: string
+          description: RS256-signed JWT access token
+          example: eyJhbGciOiJSUzI1NiJ9...
+    UserDetailsResponse:
+      type: object
+      required:
+        - user_details
+      properties:
+        user_details:
+          $ref: '#/components/schemas/UserDetails'
+    SecuredResponse:
+      type: object
+      required:
+        - userId
+        - roles
+      properties:
+        userId:
+          type: integer
+          format: int64
+          example: 12
+        roles:
+          type: array
+          items:
+            type: string
+          example:
+            - user
+            - admin
+    AdminPortalResponse:
+      type: object
+      required:
+        - howdy
+      properties:
+        howdy:
+          type: string
+          example: you are an admin!
+    JWKSResponse:
+      type: object
+      required:
+        - jwks
+      properties:
+        jwks:
+          $ref: '#/components/schemas/JWKS'
+    JWKS:
+      type: object
+      required:
+        - keys
+      properties:
+        keys:
+          type: array
+          items:
+            $ref: '#/components/schemas/JWK'
+    JWK:
+      type: object
+      description: Public JSON Web Key. Exact fields depend on key type and library output.
+      additionalProperties: true
+      properties:
+        kid:
+          type: string
+          example: my-key-id
+        kty:
+          type: string
+          example: RSA
+        alg:
+          type: string
+          example: RS256
+        use:
+          type: string
+          example: sig
+    OpaqueToken:
+      type: string
+      minLength: 26
+      maxLength: 26
+      example: abcdefghijklmnopqrstuvwxyz
+    ErrorString:
+      type: object
+      required:
+        - error
+      properties:
+        error:
+          type: string
+    ErrorMap:
+      type: object
+      required:
+        - error
+      properties:
+        error:
+          type: object
+          additionalProperties:
+            type: string

@@ -116,3 +116,10 @@ setup simple, but it is not production-ready:
 Before production, replace this with persisted signing keys, explicit key IDs,
 rotation support, and JWKS output that includes active public keys until all
 tokens signed by retired keys have expired.
+
+## API Spec
+
+The current OpenAPI spec for the identity API lives at docs/openapi.yaml
+
+It documents the routes mounted under `/v1/identity`, including the demo routes
+that are available outside production.
