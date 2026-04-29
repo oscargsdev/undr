@@ -61,11 +61,11 @@ func TestHandler_RegisterUserHandler(t *testing.T) {
 			},
 		},
 		{
-			name:       "bcrypt rejects password longer than 72 bytes",
+			name:       "password longer than bcrypt limit returns validation error",
 			body:       `{"username":"alice","email":"alice@example.com","password":"` + strings.Repeat("a", 73) + `"}`,
-			wantStatus: http.StatusInternalServerError,
+			wantStatus: http.StatusUnprocessableEntity,
 			assert: func(t *testing.T, rr *httptest.ResponseRecorder, svc *mockIdentityService) {
-				assertExactError(t, rr, "the server encountered an error and could not process your request")
+				assertErrorField(t, rr, "password", "must not be more than 72 bytes long")
 				if svc.registerUserCalls != 0 {
 					t.Fatalf("expected RegisterUser not to be called, got %d calls", svc.registerUserCalls)
 				}

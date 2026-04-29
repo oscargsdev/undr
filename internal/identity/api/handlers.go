@@ -79,17 +79,17 @@ func (h *handler) registerUserHandler(w http.ResponseWriter, r *http.Request) {
 		Activated: false,
 	}
 
+	v := validator.New()
+
+	if domain.ValidateNewUser(v, user, input.Password); !v.Valid() {
+		h.responder.FailedValidationResponse(w, r, v.Errors)
+		return
+	}
+
 	err = user.Password.Set(input.Password)
 	if err != nil {
 		h.logError(r, err)
 		h.responder.ServerErrorResponse(w, r, err)
-		return
-	}
-
-	v := validator.New()
-
-	if domain.ValidateUser(v, user); !v.Valid() {
-		h.responder.FailedValidationResponse(w, r, v.Errors)
 		return
 	}
 
